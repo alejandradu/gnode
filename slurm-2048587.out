@@ -1,0 +1,133 @@
+/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/torchvision/io/image.py:13: UserWarning: Failed to load image Python extension: libjpeg.so.8: cannot open shared object file: No such file or directory
+  warn(f"Failed to load image Python extension: {e}")
+2024-03-12 16:17:32,615	INFO worker.py:1724 -- Started a local Ray instance.
+2024-03-12 16:17:47,774	INFO tune.py:220 -- Initializing Ray automatically. For cluster usage or custom Ray initialization, call `ray.init(...)` before `tune.run(...)`.
+2024-03-12 16:17:47,813	INFO tune.py:592 -- [output] This will use the new output engine with verbosity 1. To disable the new output and use the legacy output engine, set the environment variable RAY_AIR_NEW_OUTPUT=0. For more information, please see https://github.com/ray-project/ray/issues/36949
+2024-03-12 16:17:48,137	WARNING tune.py:916 -- AIR_VERBOSITY is set, ignoring passed-in ProgressReporter for now.
+[36m(pid=2298288)[0m /home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/torchvision/io/image.py:13: UserWarning: Failed to load image Python extension: libjpeg.so.8: cannot open shared object file: No such file or directory
+[36m(pid=2298288)[0m   warn(f"Failed to load image Python extension: {e}")
+[36m(train pid=2298288)[0m /home/ad2002/gnode/ctd/task_modeling/task_train_prep.py:46: UserWarning: 
+[36m(train pid=2298288)[0m The version_base parameter is not specified.
+[36m(train pid=2298288)[0m Please specify a compatability version level, or None.
+[36m(train pid=2298288)[0m Will assume defaults for version 1.1
+[36m(train pid=2298288)[0m   with hydra.initialize(
+[36m(train pid=2298288)[0m /home/ad2002/gnode/ctd/task_modeling/task_train_prep.py:46: UserWarning: 
+[36m(train pid=2298288)[0m The version_base parameter is not specified.
+[36m(train pid=2298288)[0m Please specify a compatability version level, or None.
+[36m(train pid=2298288)[0m Will assume defaults for version 1.1
+[36m(train pid=2298288)[0m   with hydra.initialize(
+[36m(train pid=2298288)[0m [rank: 0] Seed set to 0
+[36m(train pid=2298288)[0m /home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/tune/integration/pytorch_lightning.py:194: `ray.tune.integration.pytorch_lightning.TuneReportCallback` is deprecated. Use `ray.tune.integration.pytorch_lightning.TuneReportCheckpointCallback` instead.
+[36m(train pid=2298288)[0m GPU available: True (cuda), used: True
+[36m(train pid=2298288)[0m TPU available: False, using: 0 TPU cores
+[36m(train pid=2298288)[0m IPU available: False, using: 0 IPUs
+[36m(train pid=2298288)[0m HPU available: False, using: 0 HPUs
+2024-03-12 16:18:20,376	ERROR tune_controller.py:1374 -- Trial task failed for trial train_8bfc5_00000
+Traceback (most recent call last):
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/air/execution/_internal/event_manager.py", line 110, in resolve_future
+    result = ray.get(future)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
+    return fn(*args, **kwargs)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/_private/client_mode_hook.py", line 103, in wrapper
+    return func(*args, **kwargs)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/_private/worker.py", line 2624, in get
+    raise value.as_instanceof_cause()
+ray.exceptions.RayTaskError(AssertionError): [36mray::ImplicitFunc.train()[39m (pid=2298288, ip=172.21.1.129, actor_id=3bec473717009be508d8734801000000, repr=train)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/tune/trainable/trainable.py", line 342, in train
+    raise skipped from exception_cause(skipped)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/air/_internal/util.py", line 88, in run
+    self._ret = self._target(*self._args, **self._kwargs)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/tune/trainable/function_trainable.py", line 115, in <lambda>
+    training_func=lambda: self._trainable_func(self.config),
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/tune/trainable/function_trainable.py", line 332, in _trainable_func
+    output = fn()
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/tune/trainable/util.py", line 138, in inner
+    return trainable(config, **fn_kwargs)
+  File "/home/ad2002/gnode/ctd/task_modeling/task_train_prep.py", line 168, in train
+    trainer.fit(model=task_wrapper, datamodule=datamodule)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 44, in _call_and_handle_interrupt
+    return trainer_fn(*args, **kwargs)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 947, in _run
+    self.strategy.setup_environment()
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/pytorch_lightning/strategies/strategy.py", line 128, in setup_environment
+    self.accelerator.setup_device(self.root_device)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/pytorch_lightning/accelerators/cuda.py", line 44, in setup_device
+    _check_cuda_matmul_precision(device)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/lightning_fabric/accelerators/cuda.py", line 348, in _check_cuda_matmul_precision
+    major, _ = torch.cuda.get_device_capability(device)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/torch/cuda/__init__.py", line 357, in get_device_capability
+    prop = get_device_properties(device)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/torch/cuda/__init__.py", line 371, in get_device_properties
+    _lazy_init()  # will define _get_device_properties
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/torch/cuda/__init__.py", line 221, in _lazy_init
+    raise AssertionError("Torch not compiled with CUDA enabled")
+AssertionError: Torch not compiled with CUDA enabled
+╭──────────────────────────────────────────────────────────────╮
+│ Configuration for experiment     train_2024-03-12_16-17-47   │
+├──────────────────────────────────────────────────────────────┤
+│ Search algorithm                 BasicVariantGenerator       │
+│ Scheduler                        FIFOScheduler               │
+│ Number of trials                 1                           │
+╰──────────────────────────────────────────────────────────────╯
+
+View detailed results here: /scratch/network/ad2002/content/runs/task-trained/20240312_NODE_NBFF_Test/train_2024-03-12_16-17-47
+To visualize your results with TensorBoard, run: `tensorboard --logdir /home/ad2002/ray_results/train_2024-03-12_16-17-47`
+
+Trial status: 1 PENDING
+Current time: 2024-03-12 16:17:48. Total running time: 0s
+Logical resource usage: 0/48 CPUs, 0/1 GPUs (0.0/1.0 accelerator_type:A100)
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Trial name          status       trainer/max_epochs     ...pper/weight_decay     params/seed │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│ train_8bfc5_00000   PENDING                     150                    1e-08               0 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+
+Trial train_8bfc5_00000 started with configuration:
+╭──────────────────────────────────────────╮
+│ Trial train_8bfc5_00000 config           │
+├──────────────────────────────────────────┤
+│ params/seed                            0 │
+│ task_wrapper/weight_decay          1e-08 │
+│ trainer/max_epochs                   150 │
+╰──────────────────────────────────────────╯
+
+Trial status: 1 RUNNING
+Current time: 2024-03-12 16:18:18. Total running time: 30s
+Logical resource usage: 8.0/48 CPUs, 0.9/1 GPUs (0.0/1.0 accelerator_type:A100)
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Trial name          status       trainer/max_epochs     ...pper/weight_decay     params/seed │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│ train_8bfc5_00000   RUNNING                     150                    1e-08               0 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+
+Trial train_8bfc5_00000 errored after 0 iterations at 2024-03-12 16:18:20. Total running time: 32s
+Error file: /home/ad2002/ray_results/train_2024-03-12_16-17-47/0_seed=0,weight_decay=0.0000,max_epochs=150/error.txt
+
+Trial status: 1 ERROR
+Current time: 2024-03-12 16:18:20. Total running time: 32s
+Logical resource usage: 8.0/48 CPUs, 0.9/1 GPUs (0.0/1.0 accelerator_type:A100)
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Trial name          status       trainer/max_epochs     ...pper/weight_decay     params/seed │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│ train_8bfc5_00000   ERROR                       150                    1e-08               0 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+
+Number of errored trials: 1
+╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Trial name            # failures   error file                                                                                               │
+├─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ train_8bfc5_00000              1   /home/ad2002/ray_results/train_2024-03-12_16-17-47/0_seed=0,weight_decay=0.0000,max_epochs=150/error.txt │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+Traceback (most recent call last):
+  File "/home/ad2002/gnode/examples/run_task_training.py", line 128, in <module>
+    main(
+  File "/home/ad2002/gnode/examples/run_task_training.py", line 103, in main
+    tune.run(
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/tune/tune.py", line 1036, in run
+    raise TuneError("Trials did not complete", incomplete_trials)
+ray.tune.error.TuneError: ('Trials did not complete', [train_8bfc5_00000])
