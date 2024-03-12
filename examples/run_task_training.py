@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 # ---------------Options---------------
 LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
-WANDB_LOGGING = True  # Set to True to log to WandB (need an account)
+WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
 RUN_DESC = "NODE_NBFF_Test"  # For WandB and run dir
 TASK = "NBFF"  # N=3, Task to train on (see configs/task_env for options)
