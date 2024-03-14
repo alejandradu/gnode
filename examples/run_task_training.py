@@ -24,8 +24,8 @@ LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
-RUN_DESC = "NODE_NBFF_Test"  # For WandB and run dir
-TASK = "NBFF"  # N=3, Task to train on (see configs/task_env for options)
+RUN_DESC = "NODE_MultiTask_Test"  # For WandB and run dir
+TASK = "MultiTask"  # N=3, Task to train on (see configs/task_env for options)
 MODEL = "NODE"  # Model to train (see configs/model for options)
 
 # -----------------Parameter Selection -----------------------------------
