@@ -2,8 +2,12 @@ import torch
 from torch import nn
 
 
-# TODO: Rename lowercase
-class NODE(nn.Module):
+# Implement a gated neural ordinary differential equation (gNODE)
+# architecture for a neural network based on the implementation of
+# a NODE in node.py
+
+
+class gNODE(nn.Module):
     def __init__(
         self,
         num_layers,
@@ -11,6 +15,7 @@ class NODE(nn.Module):
         latent_size,
         output_size=None,
         input_size=None,
+        gating=None # NEW - what type would this be?
     ):
         super().__init__()
         self.num_layers = num_layers
@@ -18,13 +23,14 @@ class NODE(nn.Module):
         self.latent_size = latent_size
         self.output_size = output_size
         self.input_size = input_size
-        self.cell = None
+        self.generator = None
         self.readout = None
+        self.gating = gating # NEW
 
     def init_model(self, input_size, output_size):
-        self.input_size = input_size
+        self.input_size = input_size 
         self.output_size = output_size
-        self.cell = MLPCell(
+        self.generator = MLPCell(
             input_size, self.num_layers, self.layer_hidden_size, self.latent_size
         )
         self.readout = nn.Linear(self.latent_size, output_size)
