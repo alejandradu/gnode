@@ -7,7 +7,7 @@ from pathlib import Path
 import dotenv
 import ray
 from omegaconf import OmegaConf
-from ray import tune
+from ray import tune   # uses ray 1.13. ctrl+c stops the training
 from ray.tune import CLIReporter
 from ray.tune.schedulers import FIFOScheduler
 from ray.tune.search.basic_variant import BasicVariantGenerator
@@ -24,8 +24,8 @@ LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
-RUN_DESC = "NODE_MultiTask_Test"  # For WandB and run dir
-TASK = "MultiTask"  # N=3, Task to train on (see configs/task_env for options)
+RUN_DESC = "NODE_N3BFF"  # For WandB and run dir
+TASK = "N3BFF"  # N=3, Task to train on (see configs/task_env for options)
 MODEL = "NODE"  # Model to train (see configs/model for options)
 
 # -----------------Parameter Selection -----------------------------------
@@ -35,7 +35,9 @@ SEARCH_SPACE = dict(
     # ),
     task_wrapper=dict(
         # Task Wrapper Parameters -----------------------------------
-        weight_decay=tune.grid_search([1e-8]),
+        # the 2 below are really the only ones that should be tuned
+        weight_decay=tune.grid_search([1e-7,1e-8,1e-9]),
+        learning_rate=tune.grid_search([1e-4, 1e-3, 1e-2]),
     ),
     trainer=dict(
         # Trainer Parameters -----------------------------------
@@ -44,8 +46,18 @@ SEARCH_SPACE = dict(
     # Data Parameters -----------------------------------
     params=dict(
         seed=tune.grid_search([0]),
+        batch_size=tune.choice([32,64,128]),
+        num_workers=tune.choice([2,4]),
+        n_samples=tune.choice([1000]),
+        # data_env (Env): The environment to simulate
+        #     n_samples (int): The number of samples (trials) to simulate
+        #     seed (int): The random seed to use
+        #     batch_size (int): The batch size
+        #     num_workers (int): The number of workers to use for data loading
     ),
 )
+
+# add batch size, learning rate, etc
 
 
 # ------------------Data Management Variables --------------------------------
@@ -101,17 +113,15 @@ def main(
     RUN_DIR.mkdir(parents=True)
     shutil.copyfile(__file__, RUN_DIR / Path(__file__).name)
     tune.run(
-        tune.with_parameters(
-            train,
-            run_tag=run_tag_in,
-            path_dict=path_dict,
-            config_dict=config_dict,
-        ),
+        tune.with_parameters(train,run_tag=run_tag_in,path_dict=path_dict,config_dict=config_dict),
         metric="loss",
-        mode="min",
+        mode="min",  # minimize the hyperparameter
         config=SEARCH_SPACE,
-        resources_per_trial=dict(cpu=8, gpu=0.9),
-        num_samples=1,
+        resources_per_trial=dict(cpu=8, gpu=0.9),  # try doubling the cpu, check memory utilization
+                                                   # nodes: number of servers 
+                                                   # check number of trials
+                                                   # or maybe increase the number of trials 
+        num_samples=1,  # number of times to sample from hyperparam space
         storage_path=str(RUN_DIR),
         search_alg=BasicVariantGenerator(),
         scheduler=FIFOScheduler(),
