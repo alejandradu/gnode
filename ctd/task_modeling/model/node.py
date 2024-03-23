@@ -19,6 +19,7 @@ class NODE(nn.Module):
         self.output_size = output_size
         self.input_size = input_size
         self.cell = None
+        self.generator = None
         self.readout = None
 
     def init_model(self, input_size, output_size):
@@ -27,6 +28,7 @@ class NODE(nn.Module):
         self.cell = MLPCell(
             input_size, self.num_layers, self.layer_hidden_size, self.latent_size
         )
+        self.generator = MLPCell(input_size, self.num_layers, self.layer_hidden_size, self.latent_size)
         self.readout = nn.Linear(self.latent_size, output_size)
 
     def forward(self, inputs, hidden=None):

@@ -24,8 +24,8 @@ LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
-RUN_DESC = "NODE_N3BFF"  # For WandB and run dir
-TASK = "N3BFF"  # N=3, Task to train on (see configs/task_env for options)
+RUN_DESC = "NODE_N3BFF_march23"  # For WandB and run dir
+TASK = "NBFF"  # N=3, Task to train on (see configs/task_env for options)
 MODEL = "NODE"  # Model to train (see configs/model for options)
 
 # -----------------Parameter Selection -----------------------------------
@@ -36,7 +36,8 @@ SEARCH_SPACE = dict(
     task_wrapper=dict(
         # Task Wrapper Parameters -----------------------------------
         # the 2 below are really the only ones that should be tuned
-        weight_decay=tune.grid_search([1e-7,1e-8,1e-9]),
+        # TODO: finish the 1e-7 and 1e-8 (already some done) weight decay combinations by hand input later
+        weight_decay=tune.grid_search([1e-9]),
         learning_rate=tune.grid_search([1e-4, 1e-3, 1e-2]),
     ),
     trainer=dict(
@@ -46,8 +47,8 @@ SEARCH_SPACE = dict(
     # Data Parameters -----------------------------------
     params=dict(
         seed=tune.grid_search([0]),
-        batch_size=tune.choice([32,64,128]),
-        num_workers=tune.choice([2,4]),
+        batch_size=tune.choice([64,128,256]),
+        num_workers=tune.choice([4]),
         n_samples=tune.choice([1000]),
         # data_env (Env): The environment to simulate
         #     n_samples (int): The number of samples (trials) to simulate
@@ -117,7 +118,7 @@ def main(
         metric="loss",
         mode="min",  # minimize the hyperparameter
         config=SEARCH_SPACE,
-        resources_per_trial=dict(cpu=8, gpu=0.9),  # try doubling the cpu, check memory utilization
+        resources_per_trial=dict(cpu=4, gpu=1),  # try doubling the cpu, check memory utilization
                                                    # nodes: number of servers 
                                                    # check number of trials
                                                    # or maybe increase the number of trials 
