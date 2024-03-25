@@ -24,8 +24,8 @@ LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
-RUN_DESC = "NODE_N3BFF_march23"  # For WandB and run dir
-TASK = "NBFF"  # N=3, Task to train on (see configs/task_env for options)
+RUN_DESC = "NODE_12BFF_replicateTim"  # For WandB and run dir
+TASK = "NBFF"  # Task to train on (see configs/task_env for options)
 MODEL = "NODE"  # Model to train (see configs/model for options)
 
 # -----------------Parameter Selection -----------------------------------
@@ -37,19 +37,20 @@ SEARCH_SPACE = dict(
         # Task Wrapper Parameters -----------------------------------
         # the 2 below are really the only ones that should be tuned
         # TODO: finish the 1e-7 and 1e-8 (already some done) weight decay combinations by hand input later
-        weight_decay=tune.grid_search([1e-9]),
-        learning_rate=tune.grid_search([1e-4, 1e-3, 1e-2]),
+        weight_decay=tune.grid_search([1e-1]),
+        learning_rate=tune.grid_search([1e-3]),
     ),
     trainer=dict(
         # Trainer Parameters -----------------------------------
-        max_epochs=tune.choice([1500]),
+        max_epochs=tune.choice([200]),
     ),
     # Data Parameters -----------------------------------
     params=dict(
         seed=tune.grid_search([0]),
-        batch_size=tune.choice([64,128,256]),
+        batch_size=tune.choice([100]),
         num_workers=tune.choice([4]),
-        n_samples=tune.choice([1000]),
+        n_samples=tune.choice([600]),  # not adjusting the binning of trials yet
+        # we also use Adam optimizer
         # data_env (Env): The environment to simulate
         #     n_samples (int): The number of samples (trials) to simulate
         #     seed (int): The random seed to use
