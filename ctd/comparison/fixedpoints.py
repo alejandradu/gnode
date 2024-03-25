@@ -102,6 +102,8 @@ def find_fixed_points(
         n_iters=np.full_like(qstar, iter_count),
     )
 
+    all_fps.print_summary()
+
     print(f"Found {len(all_fps.xstar)} unique fixed points.")
     if compute_jacobians:
         # Compute the Jacobian for each fixed point
