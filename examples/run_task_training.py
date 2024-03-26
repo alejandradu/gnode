@@ -24,7 +24,7 @@ LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
-RUN_DESC = "NODE_12BFF_replicateTim"  # For WandB and run dir
+RUN_DESC = "NODE_12BFF_paper"  # For WandB and run dir
 TASK = "NBFF"  # Task to train on (see configs/task_env for options)
 MODEL = "NODE"  # Model to train (see configs/model for options)
 
@@ -42,13 +42,13 @@ SEARCH_SPACE = dict(
     ),
     trainer=dict(
         # Trainer Parameters -----------------------------------
-        max_epochs=tune.choice([200]),
+        max_epochs=tune.choice([1000]),
     ),
     # Data Parameters -----------------------------------
     params=dict(
         seed=tune.grid_search([0]),
         batch_size=tune.choice([100]),
-        num_workers=tune.choice([4]),
+        num_workers=tune.choice([1]),
         n_samples=tune.choice([600]),  # not adjusting the binning of trials yet
         # we also use Adam optimizer
         # data_env (Env): The environment to simulate
