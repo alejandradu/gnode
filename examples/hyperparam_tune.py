@@ -24,7 +24,7 @@ LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
-RUN_DESC = "NODE_3BFF_tune"  # For WandB and run dir
+RUN_DESC = "NODE_3BFF_300epoch"  # For WandB and run dir
 TASK = "NBFF"  # Task to train on (see configs/task_env for options)
 MODEL = "NODE"  # Model to train (see configs/model for options)
 
@@ -32,26 +32,26 @@ MODEL = "NODE"  # Model to train (see configs/model for options)
 SEARCH_SPACE = dict(
     model = dict(
         # check if all models will take this in
-        latent_size = tune.grid_search([12]),
+        latent_size = tune.grid_search([6,12,18]),
         layer_hidden_size = tune.grid_search([100]),
         num_layers = tune.grid_search([3]),
     ),
     task_wrapper=dict(
         # Task Wrapper Parameters
-        weight_decay=tune.grid_search([1e-1, 1e-2]),
-        learning_rate=tune.grid_search([1e-3, 1e-4]),
+        weight_decay=tune.grid_search([1e-1, 1e-5, 1e-8]),
+        learning_rate=tune.grid_search([1e-2, 1e-3, 1e-4]),
     ),
     trainer=dict(
         # Trainer Parameters 
-        max_epochs=tune.choice([200]),
-        log_every_n_steps=tune.choice([50]),
+        max_epochs=tune.choice([300]),
+        #log_every_n_steps=tune.choice([50]),
     ),
     # Data Parameters 
     params=dict(
         seed=tune.grid_search([0]),
-        batch_size=tune.choice([64,100,256]),
+        batch_size=tune.choice([64,128,256]),
         num_workers=tune.choice([1]),
-        n_samples=tune.choice([100]),  
+        n_samples=tune.choice([500]),  
     ),
 )
 
