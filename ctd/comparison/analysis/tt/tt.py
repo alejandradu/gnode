@@ -251,11 +251,12 @@ class Analysis_TT(Analysis):
         ax = fig.add_subplot(111, projection="3d")
         # Make a color vector based on stability
         ax.scatter(
-            xstar_pca[q_flag, 0],
-            xstar_pca[q_flag, 1],
-            xstar_pca[q_flag, 2],
-            c=colors[q_flag, :],
+           xstar_pca[q_flag, 0],
+           xstar_pca[q_flag, 1],
+           xstar_pca[q_flag, 2],
+           c=colors[q_flag, :],
         )
+        #ax.scatter(xstar_pca[q_flag, 0])
         for i in range(num_traj):
             ax.plot(
                 lats_pca[i, :, 0],
@@ -263,7 +264,7 @@ class Analysis_TT(Analysis):
                 lats_pca[i, :, 2],
             )
         # Add legend for stability
-        ax.plot([], [], "o", color="red", label="Unstable")
+        ax.plot([], [], "o", color="red", alpha=0, label="Unstable")
         ax.plot([], [], "o", color="darkgreen", label="Stable")
         ax.legend()
         ax.set_title("tt_Fixed Points")
