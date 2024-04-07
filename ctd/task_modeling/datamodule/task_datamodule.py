@@ -133,9 +133,10 @@ class TaskDataModule(pl.LightningDataModule):
         )
 
         # Check if the dataset already exists, and if so, load it
-        if os.path.isfile(fpath) and os.path.isfile(fpath_pkl):
-            logger.info(f"Loading dataset {self.name}")
-            return
+        # if os.path.isfile(fpath) and os.path.isfile(fpath_pkl):
+        #     logger.info(f"Loading dataset {self.name}")
+        #     return
+        # TODO: add some config to avoid overwriting if sure it is correct
         logger.info(f"Generating dataset {self.name}")
 
         # Simulate the task

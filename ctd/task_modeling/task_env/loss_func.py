@@ -50,7 +50,10 @@ class NBFFLoss(LossFunc):
         """Initialize the loss function
         Args:
             transition_blind (int): The number of steps to
-            ignore the effect of transitions for"""
+            ignore the effect of transitions for
+        Based on MSE loss with modifications to avoid stiffness
+        Also used for OBMLoss
+        """
 
         self.transition_blind = transition_blind
 

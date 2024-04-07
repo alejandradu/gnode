@@ -24,6 +24,8 @@ class DecoupledEnvironment(gym.Env, ABC):
 
     # All decoupled environments should have
     # a number of timesteps and a noise parameter
+    # TODO: the rest of the methods actually require more: 
+    # action_space, observation_space, context_inputs, state_label, input_labels, output_labels, coupled_env, loss_func
 
     @abstractmethod
     def __init__(self, n_timesteps: int, noise: float):
@@ -167,7 +169,7 @@ class NBitFlipFlop(DecoupledEnvironment):
         ax2.set_ylabel("Inputs")
         plt.tight_layout()
         plt.show()
-        fig1.savefig("nbitflipflop.pdf")
+        #fig1.savefig("nbitflipflop.pdf")
 
     def render_3d(self, n_trials=10):
         if self.n > 2:
@@ -431,3 +433,128 @@ class RandomTarget(Environment):
             "goal": self.goal if self.differentiable else self.detach(self.goal),
         }
         return obs, info
+    
+    
+class OneBitSum(DecoupledEnvironment):
+    """
+    An environment for a 2-bit memory task.
+    The output bit is the sign of the sum of all previous pulses.
+    TODO: note that the input/output dimensions are fixed and 
+    for any new task they have to match
+    """
+    
+    def __init__(self, n_timesteps: int, noise: float, switch_prob=0.05, transition_blind=1, n=1):
+        
+        super().__init__(n_timesteps=n_timesteps, noise=noise)
+        self.dataset_name = "OneBitSum"
+        self.action_space = spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
+        # below is effectively nothing
+        self.context_inputs = spaces.Box(low=-1.5, high=1.5, shape=(0,), dtype=np.float32)
+        self.sum = 0
+        self.state = np.zeros(1)
+        self.n_timesteps = n_timesteps
+        self.noise = noise
+        self.switch_prob = switch_prob
+        # special just to plot the difference
+        self.inputs_diff = np.zeros(n_timesteps)
+        self.loss_func = NBFFLoss(transition_blind=transition_blind)
+        # remaining attributes
+        self.input_labels = ["Input"]
+        self.output_labels = ["Output"]
+        self.coupled_env = False
+        self.transition_blind = transition_blind
+        self.n = n
+        
+        
+    def step(self, action):
+        self.sum += action
+        self.state[0] = np.sign(self.sum)
+        
+    def generate_trial(self):
+        # make one trail of 2bitmem
+        self.reset()
+        
+        # Generate the times when the bit flips
+        inputRand = np.random.random(size=(self.n_timesteps,1))
+        inputs_bits = np.zeros((self.n_timesteps, 1))
+        inputs_bits[inputRand > (1 - self.switch_prob)] = 1  
+        inputs_bits[inputRand < (self.switch_prob)] = -1
+        
+        # Set the first 3 inputs to 0 to make sure no inputs come in immediately
+        inputs_bits[0:3, :] = 0
+        
+        # Accumulated difference
+        this_sum = 0
+        for i in range(self.n_timesteps):
+            this_sum += inputs_bits[i]
+            self.inputs_diff[i] = np.clip(this_sum, -10, 10)
+        
+        # Generate DESIRED outputs given inputs
+        outputs = np.zeros((self.n_timesteps,1))
+        for i in range(self.n_timesteps):
+            self.step(inputs_bits[i,:])
+            outputs[i,:] = self.state
+        
+        # Add noise to the inputs for the trial
+        noisy_inputs = inputs_bits + np.random.normal(loc=0.0, scale=self.noise, size=inputs_bits.shape)
+        return noisy_inputs, outputs, inputs_bits
+        
+    def reset(self):
+        self.sum = 0
+        self.state = np.zeros(1)
+        return self.state
+    
+    def generate_dataset(self, n_samples):
+        # Generates a dataset for the NBFF task
+        # NOTE are we initializing always with zeros?
+        ics_ds = np.zeros(shape=(n_samples, 1))
+        outputs_ds = np.zeros(shape=(n_samples, self.n_timesteps, 1))
+        inputs_ds = np.zeros(shape=(n_samples, self.n_timesteps, 1))
+        true_inputs_ds = np.zeros(shape=(n_samples, self.n_timesteps, 1))
+        for i in range(n_samples):
+            inputs, outputs, true_inputs = self.generate_trial()
+            outputs_ds[i, :, :] = outputs
+            inputs_ds[i, :, :] = inputs
+            true_inputs_ds[i, :, :] = true_inputs
+
+        dataset_dict = {
+            "ics": ics_ds,
+            "inputs": inputs_ds,
+            "inputs_to_env": np.zeros(shape=(n_samples, self.n_timesteps, 0)),
+            "targets": outputs_ds,
+            "true_inputs": true_inputs_ds,
+            "conds": np.zeros(shape=(n_samples,1)),
+            # No extra info for this task, so just fill with zeros
+            "extra": np.zeros(shape=(n_samples, 1)),
+        }
+        return dataset_dict
+    
+    def render(self):
+        # Generate the trial data
+        inputs, outputs, true_inputs = self.generate_trial()
+
+        # Create a figure
+        fig, axs = plt.subplots(nrows=4, ncols=1, sharex=True)
+
+        # Plot true_inputs
+        axs[0].plot(true_inputs[:,0], color='g')
+        axs[0].set_ylabel("True Inputs")
+
+        # Plot inputs
+        axs[1].plot(inputs[:,0], color='r')
+        axs[1].set_ylabel("Inputs")
+        
+        # Plot accumulated difference
+        axs[2].plot(self.inputs_diff, color='k')
+        axs[2].set_ylabel("Accumulated input difference")
+
+        # Plot outputs
+        axs[3].plot(outputs[:,0], color='b')
+        axs[3].set_ylabel("Desired osutputs")
+
+        # Set the x-label for the last subplot
+        axs[3].set_xlabel("Time")
+
+        # Display the plot
+        plt.show()

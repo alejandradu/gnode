@@ -1,0 +1,18 @@
+
+0. send vanilla on 3bff - ONGOING
+0. plot metrics of past experiments - get optimal node DONE
+00. send gru, node on 2bff - DONE (trained in < 1h for optimized)
+1. code the 2bitmem task - DONE
+
+2. send train node, gru, vanilla on 2bitmem - ONGOING 
+- fix to always overwrite dataset until it is right
+- dimensions have to agree in 3D
+
+2a. send vanilla on 2bff with optim params
+3. code fixed point to analyze past nodes
+4. analyze fixed point for node, gru, vanilla on 3bff
+5. plot flow field on gru, node, vanilla on 3bff
+
+6. optimize node, gru, vanilla on 2bitmem
+
+...
