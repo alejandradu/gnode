@@ -16,6 +16,7 @@ def find_fixed_points(
     device="cpu",
     seed=0,
     compute_jacobians=False,
+    report_progress = True,
 ):
     # set the seed
     torch.manual_seed(seed)
@@ -65,6 +66,7 @@ def find_fixed_points(
     while True:
         # Compute q and dq for the current states
         F = model(inputs, states)
+        # minimizing the norm of the z*
         q = 0.5 * torch.sum((F.squeeze() - states.squeeze()) ** 2, dim=1)
         dq = torch.abs(q - q_prev)
         q_scalar = torch.mean(q)
@@ -78,7 +80,7 @@ def find_fixed_points(
         q_np = q.cpu().detach().numpy()
         dq_np = dq.cpu().detach().numpy()
         # Report progress
-        if iter_count % 500 == 0:
+        if report_progress and iter_count % 500 == 0:
             mean_q, std_q = np.mean(q_np), np.std(q_np)
             mean_dq, std_dq = np.mean(dq_np), np.std(dq_np)
             print(f"\nIteration {iter_count}/{max_iters}")
@@ -102,7 +104,7 @@ def find_fixed_points(
         n_iters=np.full_like(qstar, iter_count),
     )
 
-    all_fps.print_summary()
+    # all_fps.print_summary()
 
     print(f"Found {len(all_fps.xstar)} unique fixed points.")
     if compute_jacobians:

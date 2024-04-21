@@ -24,7 +24,7 @@ LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
-RUN_DESC = "GRU_OBS_300epoch"  # For WandB and run dir
+RUN_DESC = "GRU_OBS_200epoch_correct"  # For WandB and run dir
 TASK = "OneBitSum"  # Task to train on (see configs/task_env for options)
 MODEL = "GRU_RNN"  # Model to train (see configs/model for options)
 
@@ -38,19 +38,18 @@ SEARCH_SPACE = dict(
     ),
     task_wrapper=dict(
         # Task Wrapper Parameters
-        weight_decay=tune.grid_search([1e-3, 1e-7]),
-        learning_rate=tune.grid_search([1e-4, 1e-6, 1e-7]),
+        weight_decay=tune.grid_search([1e-6, 1e-5]),
+        learning_rate=tune.grid_search([1e-2]),
     ),
     trainer=dict(
         # Trainer Parameters 
-        max_epochs=tune.choice([300]),
+        max_epochs=tune.choice([200]),
         log_every_n_steps=tune.choice([2]),
     ),
     # Data Parameters 
     params=dict(
         seed=tune.grid_search([0]),
-        # any specific reason why these are a lot bigger than from node?
-        batch_size=tune.choice([256, 512]),
+        batch_size=tune.choice([264]),
         num_workers=tune.choice([1]),
         n_samples=tune.choice([500]),  
     ),

@@ -24,7 +24,7 @@ LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
-RUN_DESC = "NODE_OBS_300epoch"  # For WandB and run dir
+RUN_DESC = "NODE_OBS_200epoch_2D"  # For WandB and run dir
 TASK = "OneBitSum"  # Task to train on (see configs/task_env for options)
 MODEL = "NODE"  # Model to train (see configs/model for options)
 
@@ -32,24 +32,24 @@ MODEL = "NODE"  # Model to train (see configs/model for options)
 SEARCH_SPACE = dict(
     model = dict(
         # check if all models will take this in
-        latent_size = tune.grid_search([2,3,6]),
+        latent_size = tune.grid_search([2]),
         layer_hidden_size = tune.grid_search([100]),
         num_layers = tune.grid_search([3]),
     ),
     task_wrapper=dict(
         # Task Wrapper Parameters
-        weight_decay=tune.grid_search([1e-7, 1e-8]),
+        weight_decay=tune.grid_search([1e-8, 1e-9]),
         learning_rate=tune.grid_search([1e-3, 1e-4]),
     ),
     trainer=dict(
         # Trainer Parameters 
-        max_epochs=tune.choice([300]),
+        max_epochs=tune.choice([200]),
         log_every_n_steps=tune.choice([2]),
     ),
     # Data Parameters 
     params=dict(
         seed=tune.grid_search([0]),
-        batch_size=tune.choice([64,128]),
+        batch_size=tune.choice([256]),
         num_workers=tune.choice([1]),
         n_samples=tune.choice([500]),  
     ),
@@ -96,7 +96,7 @@ config_dict = dict(
     datamodule_task=Path(f"configs/datamodule_train/datamodule_{TASK}.yaml"),
     datamodule_sim=Path(f"configs/datamodule_sim/datamodule_{TASK}.yaml"),
     model=Path(f"configs/model/{MODEL}.yaml"),
-    # simulator=Path(f"configs/simulator/default_{TASK}.yaml"),
+    simulator=Path(f"configs/simulator/default_{TASK}.yaml"),
     callbacks=Path(f"configs/callbacks/default_{TASK}.yaml"),
     loggers=Path("configs/logger/default.yaml"),
     trainer=Path("configs/trainer/default.yaml"),

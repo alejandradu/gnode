@@ -441,23 +441,29 @@ class OneBitSum(DecoupledEnvironment):
     The output bit is the sign of the sum of all previous pulses.
     TODO: note that the input/output dimensions are fixed and 
     for any new task they have to match
+    TODO: for now include bounded and unbounded here, but might need separation
     """
     
-    def __init__(self, n_timesteps: int, noise: float, switch_prob=0.05, transition_blind=1, n=1):
+    def __init__(self, n_timesteps: int, noise: float, switch_prob=0.05, transition_blind=1, n=1, limits: tuple = (-1, 1)):
         
         super().__init__(n_timesteps=n_timesteps, noise=noise)
         self.dataset_name = "OneBitSum"
         self.action_space = spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
+        self.limits = limits
+        # this has always been in the range -1, 1
+        if limits is not None:
+            self.observation_space = spaces.Box(low=limits[0], high=limits[1], shape=(1,), dtype=np.float32)
+        else:
+            self.observation_space = spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
         # below is effectively nothing
         self.context_inputs = spaces.Box(low=-1.5, high=1.5, shape=(0,), dtype=np.float32)
-        self.sum = 0
+        # self.sum = 0
         self.state = np.zeros(1)
         self.n_timesteps = n_timesteps
         self.noise = noise
         self.switch_prob = switch_prob
         # special just to plot the difference
-        self.inputs_diff = np.zeros(n_timesteps)
+        # self.inputs_diff = np.zeros(n_timesteps)
         self.loss_func = NBFFLoss(transition_blind=transition_blind)
         # remaining attributes
         self.input_labels = ["Input"]
@@ -468,37 +474,44 @@ class OneBitSum(DecoupledEnvironment):
         
         
     def step(self, action):
-        self.sum += action
-        self.state[0] = np.sign(self.sum)
+        self.state[0] = np.sign(action)
         
     def generate_trial(self):
-        # make one trail of 2bitmem
         self.reset()
         
         # Generate the times when the bit flips
         inputRand = np.random.random(size=(self.n_timesteps,1))
         inputs_bits = np.zeros((self.n_timesteps, 1))
-        inputs_bits[inputRand > (1 - self.switch_prob)] = 1  
-        inputs_bits[inputRand < (self.switch_prob)] = -1
         
-        # Set the first 3 inputs to 0 to make sure no inputs come in immediately
-        inputs_bits[0:3, :] = 0
-        
-        # Accumulated difference
-        this_sum = 0
-        for i in range(self.n_timesteps):
-            this_sum += inputs_bits[i]
-            self.inputs_diff[i] = np.clip(this_sum, -10, 10)
+        if self.limits is not None:
+            inputs_diff = np.zeros(self.n_timesteps)
+            this_sum = 0
+            # will always start at 0
+            inputs_bits[0] = 0
+            inputs_diff[0] = 0
+            # for loop implementation to guarantee the sum is within the limits
+            for i in range(2,self.n_timesteps):
+                if this_sum == self.limits[1]:
+                    inputs_bits[i] = np.random.choice([0,-1])
+                elif this_sum == self.limits[0]:
+                    inputs_bits[i] = np.random.choice([1,0])
+                else:
+                    inputs_bits[i] = np.random.choice([-1,0,1])
+                this_sum += inputs_bits[i]
+                inputs_diff[i] = this_sum
+        else:
+            inputs_bits[inputRand > (1 - self.switch_prob)] = 1  
+            inputs_bits[inputRand < (self.switch_prob)] = -1
         
         # Generate DESIRED outputs given inputs
         outputs = np.zeros((self.n_timesteps,1))
         for i in range(self.n_timesteps):
-            self.step(inputs_bits[i,:])
+            self.step(inputs_diff[i])
             outputs[i,:] = self.state
         
         # Add noise to the inputs for the trial
         noisy_inputs = inputs_bits + np.random.normal(loc=0.0, scale=self.noise, size=inputs_bits.shape)
-        return noisy_inputs, outputs, inputs_bits
+        return noisy_inputs, outputs, inputs_bits, inputs_diff
         
     def reset(self):
         self.sum = 0
@@ -513,7 +526,7 @@ class OneBitSum(DecoupledEnvironment):
         inputs_ds = np.zeros(shape=(n_samples, self.n_timesteps, 1))
         true_inputs_ds = np.zeros(shape=(n_samples, self.n_timesteps, 1))
         for i in range(n_samples):
-            inputs, outputs, true_inputs = self.generate_trial()
+            inputs, outputs, true_inputs, _ = self.generate_trial()
             outputs_ds[i, :, :] = outputs
             inputs_ds[i, :, :] = inputs
             true_inputs_ds[i, :, :] = true_inputs
@@ -532,26 +545,26 @@ class OneBitSum(DecoupledEnvironment):
     
     def render(self):
         # Generate the trial data
-        inputs, outputs, true_inputs = self.generate_trial()
+        inputs, outputs, true_inputs, inputs_diff = self.generate_trial()
 
         # Create a figure
         fig, axs = plt.subplots(nrows=4, ncols=1, sharex=True)
 
         # Plot true_inputs
         axs[0].plot(true_inputs[:,0], color='g')
-        axs[0].set_ylabel("True Inputs")
+        axs[0].set_title("Noiseless Inputs")
 
         # Plot inputs
         axs[1].plot(inputs[:,0], color='r')
-        axs[1].set_ylabel("Inputs")
+        axs[1].set_title("Inputs")
         
         # Plot accumulated difference
-        axs[2].plot(self.inputs_diff, color='k')
-        axs[2].set_ylabel("Accumulated input difference")
+        axs[2].plot(inputs_diff, color='k')
+        axs[2].set_title("Accumulated input sum")
 
         # Plot outputs
         axs[3].plot(outputs[:,0], color='b')
-        axs[3].set_ylabel("Desired osutputs")
+        axs[3].set_title("Targets")
 
         # Set the x-label for the last subplot
         axs[3].set_xlabel("Time")
