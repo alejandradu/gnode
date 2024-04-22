@@ -24,7 +24,7 @@ LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
-RUN_DESC = "NODE_OBS_200epoch_2D"  # For WandB and run dir
+RUN_DESC = "NODE_OBS_200epoch_3D"  # For WandB and run dir
 TASK = "OneBitSum"  # Task to train on (see configs/task_env for options)
 MODEL = "NODE"  # Model to train (see configs/model for options)
 
@@ -32,14 +32,14 @@ MODEL = "NODE"  # Model to train (see configs/model for options)
 SEARCH_SPACE = dict(
     model = dict(
         # check if all models will take this in
-        latent_size = tune.grid_search([2]),
+        latent_size = tune.grid_search([3]),
         layer_hidden_size = tune.grid_search([100]),
         num_layers = tune.grid_search([3]),
     ),
     task_wrapper=dict(
         # Task Wrapper Parameters
-        weight_decay=tune.grid_search([1e-8, 1e-9]),
-        learning_rate=tune.grid_search([1e-3, 1e-4]),
+        weight_decay=tune.grid_search([1e-9, 1e-10]),
+        learning_rate=tune.grid_search([1e-3, 1e-2]),
     ),
     trainer=dict(
         # Trainer Parameters 

@@ -170,6 +170,54 @@ class Analysis_TT(Analysis):
 
         plt.suptitle("Task-trained Latent Activity")
         plt.show()
+        
+    def plot_trial_io_no_pca(self, num_trials, latent_size):
+        ics, inputs, targets = self.get_model_inputs()
+        out_dict = self.get_model_outputs()
+        latents = out_dict["latents"].detach().numpy()
+        controlled = out_dict["controlled"].detach().numpy()
+        fig = plt.figure(figsize=(3 * num_trials, 6))
+
+        for i in range(num_trials):
+            ax1 = fig.add_subplot(4, num_trials, i + 1)
+            for j in range(latent_size):
+                ax1.plot(latents[i, :, j])
+            ax1.set_title(f"Trial {i}")
+            
+            ax2 = fig.add_subplot(4, num_trials, i + num_trials + 1)
+            for j in range(controlled.shape[-1]):
+                ax2.plot(controlled[i, :, j])
+                
+            ax3 = fig.add_subplot(4, num_trials, i + 2 * num_trials + 1)
+            for j in range(targets.shape[-1]):
+                ax3.plot(targets[i, :, j])
+
+            ax4 = fig.add_subplot(4, num_trials, i + 3 * num_trials + 1)
+            for j in range(inputs.shape[-1]):
+                ax4.plot(inputs[i, :, j])
+                
+            if i == 0:
+                ax1.set_ylabel("Latent Activity")
+                ax2.set_ylabel("Controlled")
+                ax3.set_ylabel("Targets")
+                ax4.set_ylabel("Inputs")
+
+            if i == 4:
+                ax1.set_xlabel("Time")
+                ax2.set_xlabel("Time")
+                ax3.set_xlabel("Time")
+                ax4.set_xlabel("Time")
+            else:
+                ax1.set_xlabel("")
+                ax2.set_xlabel("")
+                ax3.set_xlabel("")
+                ax4.set_xlabel("")
+                ax1.set_xticks([])
+                ax2.set_xticks([])
+                ax3.set_xticks([])
+                ax4.set_xticks([])
+
+        plt.show()
 
     def compute_FPs(
         self,
@@ -252,7 +300,7 @@ class Analysis_TT(Analysis):
 
         colors = np.zeros((xstar.shape[0], 3))
         colors[is_stable, :] = np.array([0, 0.3922, 0])  # darkgreen
-        colors[~is_stable, 0] = 1
+        colors[~is_stable, 0] = 0
 
         q_flag = q_vals < q_thresh
         if do_pca:
@@ -325,7 +373,7 @@ class Analysis_TT(Analysis):
                         )
         
         # Add legend for stability
-        ax.plot([], [], "o", color="red", label="Unstable")
+        ax.plot([], [], "o", color="black", label="Unstable")
         ax.plot([], [], "o", color="darkgreen", label="Stable")
         ax.legend()
         ax.set_title("Fixed Points for Task-Trained")
@@ -341,17 +389,32 @@ class Analysis_TT(Analysis):
     
     # provide an an array of tuples from the observed limits
     # of the NON-PCA latents that plot the fixed points
-    def plot_velocity_field_2D(self, inputs, latents_range, num_points, xstar=None, q_flag=None, colors=None):
+    def plot_velocity_field_non_pca(self, inputs, latents_range, 
+                                    num_points, xstar=None, q_flag=None, 
+                                    colors=None, num_traj=None):
         model = self.wrapper.model.cell
  
-        # Create a grid of points within latents_range
-        x = np.linspace(latents_range[0][0], latents_range[0][1], num_points)
-        y = np.linspace(latents_range[1][0], latents_range[1][1], num_points)
-        X, Y = np.meshgrid(x, y)
+        if len(latents_range) == 2:
+            # Create a grid of points within latents_range
+            x = np.linspace(latents_range[0][0], latents_range[0][1], num_points)
+            y = np.linspace(latents_range[1][0], latents_range[1][1], num_points)
+            X, Y = np.meshgrid(x, y)
 
-        # Combine X and Y into a 2D array of shape (m*n, 2)
-        coordinates = np.c_[X.ravel(), Y.ravel()]
-        states_tensor = torch.from_numpy(coordinates)
+            # Combine X and Y into a 2D array of shape (m*n, 2)
+            states = np.c_[X.ravel(), Y.ravel()]
+        elif len(latents_range) == 3:
+            # Create a grid of points within latents_range
+            x = np.linspace(latents_range[0][0], latents_range[0][1], num_points)
+            y = np.linspace(latents_range[1][0], latents_range[1][1], num_points)
+            z = np.linspace(latents_range[2][0], latents_range[2][1], num_points)
+            X, Y, Z = np.meshgrid(x, y, z)
+
+            # Combine X, Y, and Z into a 2D array of shape (m*n*p, 3)
+            states = np.c_[X.ravel(), Y.ravel(), Z.ravel()]
+        else:
+            raise ValueError("latents_range must have 2 or 3 elements")
+        
+        states_tensor = torch.from_numpy(states)
         states_tensor = states_tensor.float()
         
         print("states_tensor shape: ", states_tensor.shape)
@@ -366,10 +429,13 @@ class Analysis_TT(Analysis):
 
         # Calculate F - states for all states
         # get U and V values to plot
-        U, V = (F - states_tensor).detach().numpy().T
-        
-        # Calculate the magnitude of the vectors
-        magnitude = np.sqrt(U**2 + V**2)
+        if (len(latents_range) == 2):
+            U, V = (F - states_tensor).detach().numpy().T
+            magnitude = np.sqrt(U**2 + V**2)
+        else:
+            U, V, W = (F - states_tensor).detach().numpy().T
+            magnitude = np.sqrt(U**2 + V**2 + W**2)
+    
 
         # Normalize the magnitude to range [0, 1] for color mapping
         magnitude = (magnitude - np.min(magnitude)) / (np.max(magnitude) - np.min(magnitude))
@@ -378,17 +444,36 @@ class Analysis_TT(Analysis):
         cmap = plt.cm.coolwarm      
 
         # Plot the velocity field
-        fig, ax = plt.subplots(figsize=(10, 10))
-        ax.quiver(X, Y, U, V, magnitude, cmap=cmap)
-        
-        if xstar is not None:
-            ax.scatter(
-                   xstar[q_flag, 0],
-                   xstar[q_flag, 1],
-                   c=colors[q_flag, :])
+        if (len(latents_range) == 2):
+            fig, ax = plt.subplots(figsize=(10, 10))
+            ax.quiver(X, Y, U, V, magnitude, cmap=cmap)
+            if xstar is not None:
+                ax.scatter(
+                       xstar[q_flag, 0],
+                       xstar[q_flag, 1],
+                       c=colors[q_flag, :])
+            if num_traj is not None:
+                latents = self.get_latents().detach().numpy()
+                for i in range(num_traj):
+                    # select a random i every time, without repeats
+                    i = np.random.randint(0, latents.shape[0])
+                    ax.plot(latents[i, :, 0],
+                            latents[i, :, 1],)
+        else:
+            U = U.reshape(20, 20, 20)
+            V = V.reshape(20, 20, 20)
+            W = W.reshape(20, 20, 20)
+            colors = cmap(magnitude).reshape(20, 20, 20, -1)
+            fig = plt.figure(figsize=(12, 12))
+            ax = fig.add_subplot(111, projection="3d")
+            ax.quiver(X, Y, Z, U, V, W, color=cmap(magnitude))
+            if xstar is not None:
+                ax.scatter(
+                    xstar[q_flag, 0],
+                    xstar[q_flag, 1],
+                    xstar[q_flag, 2], 
+                    c=colors[q_flag, :])
             
-        ax.set_ylabel("Latent 2")
-        ax.set_xlabel("Latent 1")
         ax.set_title("Latent Velocity Field")
         plt.show()
         
