@@ -8,6 +8,9 @@ import numpy as np
 import torch
 from DSA.stats import dsa_bw_data_splits, dsa_to_id
 from sklearn.decomposition import PCA
+import matplotlib.animation as animation
+import matplotlib.patches as mpatches
+from matplotlib.colors import ListedColormap
 
 from ctd.comparison.analysis.analysis import Analysis
 from ctd.comparison.fixedpoints import find_fixed_points
@@ -27,8 +30,11 @@ class Analysis_TT(Analysis):
     def load_wrapper(self, filepath, use_train_dm=False):
 
         with open(filepath + "model.pkl", "rb") as f:
+            # you pass in (initial conditions, inputs, targets) to wrapper
             self.wrapper = pickle.load(f)
         self.env = self.wrapper.task_env
+        # you pass in (inputs, latent_state) to model.cell
+        # so I am calculating the field for something with set inputs and targets
         self.model = self.wrapper.model
         if use_train_dm:
             with open(filepath + "datamodule_train.pkl", "rb") as f:
@@ -72,6 +78,7 @@ class Analysis_TT(Analysis):
         tt_ics = torch.Tensor(all_data["ics"])
         tt_inputs = torch.Tensor(all_data["true_inputs"])
         tt_targets = torch.Tensor(all_data["targets"])
+        print()
         return tt_ics, tt_inputs, tt_targets
 
     def get_model_outputs(self):
@@ -91,6 +98,24 @@ class Analysis_TT(Analysis):
     def get_latents_noiseless(self):
         out_dict = self.get_model_outputs_noiseless()
         return out_dict["latents"]
+    
+    def get_latents_noiseless_target_color(self):
+        # return the latents and a color array depending on if the trajectory 
+        # had a target of -1, 0 or 1
+        tt_ics, tt_inputs, tt_targets = self.get_model_inputs()
+        out_dict = self.wrapper(tt_ics, tt_inputs, tt_targets)
+        latents = out_dict["latents"].detach().numpy()
+        tt_targets = tt_targets.detach().numpy()
+        trials, steps, dimension = tt_targets.shape
+        
+        # Create a color array based on tt_targets
+        color_dict = {-1: 'red', 0: 'green', 1: 'blue'}
+        colors = np.array([[color_dict[tt_targets[t,s,0]] for s in range(steps)] for t in range(tt_targets.shape[0])])
+
+        # Create a colormap using color_dict
+        cmap = ListedColormap(['red', 'green', 'blue'])
+             
+        return latents, colors, cmap
 
     def get_latents_pca(self, num_PCs=3):
         latents = self.get_latents()
@@ -231,6 +256,7 @@ class Analysis_TT(Analysis):
         seed=0,
         compute_jacobians=True,
         report_progress = True,
+        initial_states = None,
     ):
         # Compute latent activity from task trained model
         if inputs is None and noiseless:
@@ -242,7 +268,7 @@ class Analysis_TT(Analysis):
         else:
             latents = self.get_latents()
 
-        fps = find_fixed_points(
+        fps, velocity_vectors = find_fixed_points(
             model=self.wrapper.model.cell,
             state_trajs=latents,
             inputs=inputs,
@@ -254,8 +280,9 @@ class Analysis_TT(Analysis):
             seed=seed,
             compute_jacobians=compute_jacobians,
             report_progress = report_progress,
+            initial_states = initial_states,
         )
-        return fps
+        return fps, velocity_vectors
 
     def plot_fps(
         self,
@@ -275,10 +302,13 @@ class Analysis_TT(Analysis):
         plot_only_points=False,
         report_progress = True,
         return_points = False,
+        noiseless=True,
+        initial_states = None,
     ):
 
         latents = self.get_latents().detach().numpy()
-        fps = self.compute_FPs(
+        fps, velocity_vectors = self.compute_FPs(
+            noiseless=noiseless,
             inputs=inputs,
             n_inits=n_inits,
             noise_scale=noise_scale,
@@ -288,6 +318,7 @@ class Analysis_TT(Analysis):
             seed=seed,
             compute_jacobians=compute_jacobians,
             report_progress = report_progress,
+            initial_states = initial_states,
         )
         xstar = fps.xstar
         q_vals = fps.qstar
@@ -383,99 +414,121 @@ class Analysis_TT(Analysis):
             return fps, pca
         
         if return_points:
-            return fps, xstar, q_flag, colors
+            return velocity_vectors, xstar, q_flag, colors
         
         return fps
+        
     
-    # provide an an array of tuples from the observed limits
-    # of the NON-PCA latents that plot the fixed points
-    def plot_velocity_field_non_pca(self, inputs, latents_range, 
-                                    num_points, xstar=None, q_flag=None, 
-                                    colors=None, num_traj=None):
+    def plot_velocity_field_non_pca(self, inputs, latents_range, num_points, 
+                                    xstar=None, q_flag=None, colors=None, 
+                                    num_traj=None, cmap=plt.cm.Reds, 
+                                    return_animation=False, validate_input_val=None):
         model = self.wrapper.model.cell
- 
-        if len(latents_range) == 2:
-            # Create a grid of points within latents_range
-            x = np.linspace(latents_range[0][0], latents_range[0][1], num_points)
-            y = np.linspace(latents_range[1][0], latents_range[1][1], num_points)
-            X, Y = np.meshgrid(x, y)
 
-            # Combine X and Y into a 2D array of shape (m*n, 2)
-            states = np.c_[X.ravel(), Y.ravel()]
-        elif len(latents_range) == 3:
-            # Create a grid of points within latents_range
-            x = np.linspace(latents_range[0][0], latents_range[0][1], num_points)
-            y = np.linspace(latents_range[1][0], latents_range[1][1], num_points)
-            z = np.linspace(latents_range[2][0], latents_range[2][1], num_points)
-            X, Y, Z = np.meshgrid(x, y, z)
+        # Prepare the state space based on the dimensions in latents_range
+        grid = [np.linspace(range_[0], range_[1], num_points) for range_ in latents_range]
+        mesh = np.meshgrid(*grid, indexing='ij')
+        states = np.stack([ax.ravel() for ax in mesh], axis=-1)
 
-            # Combine X, Y, and Z into a 2D array of shape (m*n*p, 3)
-            states = np.c_[X.ravel(), Y.ravel(), Z.ravel()]
-        else:
-            raise ValueError("latents_range must have 2 or 3 elements")
-        
-        states_tensor = torch.from_numpy(states)
-        states_tensor = states_tensor.float()
-        
-        print("states_tensor shape: ", states_tensor.shape)
-        print("inputs shape: ", inputs.shape)
-        print("states type: ", states_tensor.dtype)
-        print("inputs type: ", inputs.dtype)
+        # Convert numpy array to PyTorch tensor
+        states_tensor = torch.from_numpy(states).float()
 
         # Calculate F for all states
-        F = model(inputs, states_tensor)
-        
-        print("shape of F outputs: ", F.shape)
+        F = model(inputs, states_tensor)  # Assuming model takes only states_tensor as input
 
-        # Calculate F - states for all states
-        # get U and V values to plot
-        if (len(latents_range) == 2):
-            U, V = (F - states_tensor).detach().numpy().T
-            magnitude = np.sqrt(U**2 + V**2)
+        # Compute velocity vectors
+        delta = (F - states_tensor).detach().numpy()
+        if len(latents_range) == 2:
+            U, V = delta.T
         else:
-            U, V, W = (F - states_tensor).detach().numpy().T
-            magnitude = np.sqrt(U**2 + V**2 + W**2)
-    
+            U, V, W = delta.T
 
-        # Normalize the magnitude to range [0, 1] for color mapping
-        magnitude = (magnitude - np.min(magnitude)) / (np.max(magnitude) - np.min(magnitude))
-
-        # Create a colormap that maps small magnitudes to blue and large magnitudes to red
-        cmap = plt.cm.coolwarm      
+        # Create a colormap based on the normalized magnitude
+        magnitude = np.sqrt(np.sum(delta**2, axis=-1))
+        normalized_magnitude = (magnitude - np.min(magnitude)) / (np.max(magnitude) - np.min(magnitude))
+        colors_map = cmap(normalized_magnitude.flatten())
 
         # Plot the velocity field
-        if (len(latents_range) == 2):
-            fig, ax = plt.subplots(figsize=(10, 10))
-            ax.quiver(X, Y, U, V, magnitude, cmap=cmap)
-            if xstar is not None:
-                ax.scatter(
-                       xstar[q_flag, 0],
-                       xstar[q_flag, 1],
-                       c=colors[q_flag, :])
-            if num_traj is not None:
-                latents = self.get_latents().detach().numpy()
-                for i in range(num_traj):
-                    # select a random i every time, without repeats
-                    i = np.random.randint(0, latents.shape[0])
-                    ax.plot(latents[i, :, 0],
-                            latents[i, :, 1],)
+        fig, ax = plt.subplots(figsize=(10, 10))
+        if len(latents_range) == 2:
+            ax.quiver(*np.meshgrid(*grid, indexing='ij'), U.reshape(num_points, num_points), V.reshape(num_points, num_points), color=colors_map)
         else:
-            U = U.reshape(20, 20, 20)
-            V = V.reshape(20, 20, 20)
-            W = W.reshape(20, 20, 20)
-            colors = cmap(magnitude).reshape(20, 20, 20, -1)
-            fig = plt.figure(figsize=(12, 12))
-            ax = fig.add_subplot(111, projection="3d")
-            ax.quiver(X, Y, Z, U, V, W, color=cmap(magnitude))
-            if xstar is not None:
-                ax.scatter(
-                    xstar[q_flag, 0],
-                    xstar[q_flag, 1],
-                    xstar[q_flag, 2], 
-                    c=colors[q_flag, :])
+            ax = fig.add_subplot(111, projection='3d')
+            ax.quiver(*np.meshgrid(*grid, indexing='ij'), W.reshape(num_points, num_points, num_points), V.reshape(num_points, num_points, num_points), U.reshape(num_points, num_points, num_points), color=colors_map)
             
+        # plot trajectories
+        if validate_input_val is not None: 
+            latents = self.get_empty_input_latents(validate_input_val)
+        else:
+            latents, colors_target, cmap_target = self.get_latents_noiseless_target_color()
+            # latents = self.get_latents().detach().numpy()
+        colors_time = plt.cm.viridis(np.linspace(0, 1, latents.shape[1]))
+        for i in range(num_traj):
+            ax.plot(*latents[i].T, linewidth=0.1, color='black')
+            ax.set_xlim(latents_range[0])
+            ax.set_ylim(latents_range[1])
+            ax.scatter(*latents[i].T, c=colors_target[i], cmap=cmap_target)
+        ax.set_xlim(latents_range[0])
+        ax.set_ylim(latents_range[1])
+        # ax.legend(handles=handles)
+        
+            
+        # plot fixed points
+        if xstar is not None and q_flag is not None and colors is not None:
+            ax.scatter(*xstar[q_flag].T, c=colors[q_flag, :])
+
         ax.set_title("Latent Velocity Field")
         plt.show()
+        
+        if return_animation:
+            return fig, ax
+        
+    
+    def plot_velocity_field_pca(self, inputs, latents_range, num_points, 
+                                    xstar=None, q_flag=None, colors=None, 
+                                    num_traj=None, cmap=plt.cm.Reds, 
+                                    return_animation=False, validate_input_val=None):
+        pass
+        
+        
+
+    # TODO: probably refactor to get the values of the velocity field
+    # and plots separately
+    def animate_trajectory(self, i, latents_range, num_points, inputs, filename='trajectory_animation.mp4'):
+        # Get the i'th latent trajectory
+        latents = self.get_latents().detach().numpy()
+        trajectory = latents[i]
+
+        # Create a figure and axes
+        fig, ax = self.plot_velocity_field_non_pca(inputs, latents_range, num_points)
+
+        # Create a scatter plot for the trajectory point
+        S = ax.scatter(*trajectory[0], color='red')
+
+        # Animation update function
+        def update(num):
+            # Update the trajectory point
+            S.set_offsets(trajectory[num])
+
+            # Return the updated artists
+            return S,
+
+        # Create the animation
+        ani = animation.FuncAnimation(fig, update, frames=len(trajectory), interval=200, blit=True)
+
+        # Save the animation as a video file
+        ani.save(filename, writer='ffmpeg')
+
+        plt.close(fig)
+    
+    # get trajectories where input is always value
+    def get_empty_input_latents(self, value):
+        ics, inputs, targets = self.get_model_inputs_noiseless()
+        # create a new input tensor of the same shape wit value
+        new_inputs = torch.zeros(inputs.shape) * value
+        # get the outputs
+        out_dict = self.wrapper(ics, new_inputs, targets)
+        return out_dict["latents"].detach().numpy()
         
 
     def simulate_neural_data(self, subfolder, dataset_path):

@@ -444,7 +444,7 @@ class OneBitSum(DecoupledEnvironment):
     TODO: for now include bounded and unbounded here, but might need separation
     """
     
-    def __init__(self, n_timesteps: int, noise: float, switch_prob=0.05, transition_blind=1, n=1, limits: tuple = (-1, 1)):
+    def __init__(self, n_timesteps: int, noise: float, switch_prob=0.05, transition_blind=1, n=1, limits = (-1, 1), poisson=True):
         
         super().__init__(n_timesteps=n_timesteps, noise=noise)
         self.dataset_name = "OneBitSum"
@@ -471,6 +471,28 @@ class OneBitSum(DecoupledEnvironment):
         self.coupled_env = False
         self.transition_blind = transition_blind
         self.n = n
+        self.poisson = poisson
+        
+    def simulate_poisson_process_single_arrivals(self):
+        # Calculate the rate parameter alpha
+        alpha = self.n / self.n_timesteps
+
+        # Generate inter-arrival times
+        inter_arrival_times = np.random.exponential(1/alpha, self.n)
+        inter_arrival_times_cumulative = np.cumsum(inter_arrival_times)
+
+        # Convert continuous time to discrete timesteps
+        arrival_indices = np.floor(inter_arrival_times_cumulative).astype(int)
+
+        # Create an array for the entire timestep period initialized to zero
+        arrivals = np.zeros(self.n_timesteps, dtype=int)
+
+        # Set the arrival indices to 1, ensuring no index is out of bounds or duplicated
+        # Use np.unique to ensure no index is repeated
+        filtered_indices = np.unique(arrival_indices[arrival_indices < self.n_timesteps])
+        arrivals[filtered_indices] = 1
+
+        return arrivals
         
         
     def step(self, action):
@@ -489,14 +511,28 @@ class OneBitSum(DecoupledEnvironment):
             # will always start at 0
             inputs_bits[0] = 0
             inputs_diff[0] = 0
-            # for loop implementation to guarantee the sum is within the limits
+            
+            # get the time indices for sparse pulses
+            if self.poisson:
+                time_indices = self.simulate_poisson_process_single_arrivals()
+            else:
+                # Initialize an array of zeros
+                time_indices = np.zeros(self.n_timesteps)
+
+                # Select self.n random indices
+                random_indices = np.random.choice(range(self.n_timesteps), self.n, replace=False)
+
+                # Set the selected indices to 1
+                time_indices[random_indices] = 1
+                
+            # send pulses while keeping the sum
             for i in range(2,self.n_timesteps):
-                if this_sum == self.limits[1]:
-                    inputs_bits[i] = np.random.choice([0,-1])
-                elif this_sum == self.limits[0]:
-                    inputs_bits[i] = np.random.choice([1,0])
-                else:
-                    inputs_bits[i] = np.random.choice([-1,0,1])
+                if this_sum == self.limits[1] and time_indices[i] == 1:
+                    inputs_bits[i] = -1
+                elif this_sum == self.limits[0] and time_indices[i] == 1:
+                    inputs_bits[i] = 1
+                elif time_indices[i] == 1:
+                    inputs_bits[i] = np.random.choice([-1,1])
                 this_sum += inputs_bits[i]
                 inputs_diff[i] = this_sum
         else:

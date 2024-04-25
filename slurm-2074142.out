@@ -1,0 +1,36 @@
+2024-04-22 15:28:03,908	INFO worker.py:1724 -- Started a local Ray instance.
+2024-04-22 15:28:34,979	INFO tune.py:220 -- Initializing Ray automatically. For cluster usage or custom Ray initialization, call `ray.init(...)` before `tune.run(...)`.
+2024-04-22 15:28:34,981	INFO tune.py:592 -- [output] This will use the new output engine with verbosity 1. To disable the new output and use the legacy output engine, set the environment variable RAY_AIR_NEW_OUTPUT=0. For more information, please see https://github.com/ray-project/ray/issues/36949
+2024-04-22 15:28:35,023	WARNING tune.py:916 -- AIR_VERBOSITY is set, ignoring passed-in ProgressReporter for now.
+[36m(train pid=194314)[0m /home/ad2002/gnode/ctd/task_modeling/task_train_prep.py:46: UserWarning: 
+[36m(train pid=194314)[0m The version_base parameter is not specified.
+[36m(train pid=194314)[0m Please specify a compatability version level, or None.
+[36m(train pid=194314)[0m Will assume defaults for version 1.1
+[36m(train pid=194314)[0m   with hydra.initialize(
+[36m(train pid=194314)[0m /home/ad2002/gnode/ctd/task_modeling/task_train_prep.py:46: UserWarning: 
+[36m(train pid=194314)[0m The version_base parameter is not specified.
+[36m(train pid=194314)[0m Please specify a compatability version level, or None.
+[36m(train pid=194314)[0m Will assume defaults for version 1.1
+[36m(train pid=194314)[0m   with hydra.initialize(
+[36m(train pid=194314)[0m [rank: 0] Seed set to 0
+[36m(train pid=194314)[0m /home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/ray/tune/integration/pytorch_lightning.py:194: `ray.tune.integration.pytorch_lightning.TuneReportCallback` is deprecated. Use `ray.tune.integration.pytorch_lightning.TuneReportCheckpointCallback` instead.
+[36m(train pid=194314)[0m GPU available: True (cuda), used: True
+[36m(train pid=194314)[0m TPU available: False, using: 0 TPU cores
+[36m(train pid=194314)[0m IPU available: False, using: 0 IPUs
+[36m(train pid=194314)[0m HPU available: False, using: 0 HPUs
+[36m(train pid=194314)[0m /home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/lightning_fabric/loggers/csv_logs.py:198: Experiment logs directory ./ exists and is not empty. Previous log files in this directory will be deleted when the new ones are saved!
+[36m(train pid=194314)[0m /home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/pytorch_lightning/callbacks/model_checkpoint.py:639: Checkpoint directory /home/ad2002/ray_results/train_2024-04-22_15-28-34/0_latent_size=3,layer_hidden_size=100,num_layers=3,batch_size=256,n_samples=500,num_workers=1,seed=0,learning_rate=0.0100,weight_decay=0.0000,log_every_n_steps=2,max_epochs=300 exists and is not empty.
+[36m(train pid=194314)[0m LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+[36m(train pid=194314)[0m 
+[36m(train pid=194314)[0m   | Name  | Type | Params
+[36m(train pid=194314)[0m -------------------------------
+[36m(train pid=194314)[0m 0 | model | NODE | 21.8 K
+[36m(train pid=194314)[0m -------------------------------
+[36m(train pid=194314)[0m 21.8 K    Trainable params
+[36m(train pid=194314)[0m 0         Non-trainable params
+[36m(train pid=194314)[0m 21.8 K    Total params
+[36m(train pid=194314)[0m 0.087     Total estimated model params size (MB)
+[36m(train pid=194314)[0m SLURM auto-requeueing enabled. Setting signal handlers.
+[36m(train pid=194314)[0m /home/ad2002/.conda/envs/gnode/lib/python3.10/site-packages/torch/utils/data/dataloader.py:554: UserWarning: This DataLoader will create 4 worker processes in total. Our suggested max number of worker in current system is 1, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+[36m(train pid=194314)[0m   warnings.warn(_create_warning_msg(
+slurmstepd: error: *** JOB 2074142 ON adroit-h11g3 CANCELLED AT 2024-04-22T15:31:31 ***

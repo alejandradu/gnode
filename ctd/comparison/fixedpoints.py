@@ -17,6 +17,7 @@ def find_fixed_points(
     seed=0,
     compute_jacobians=False,
     report_progress = True,
+    initial_states = None,
 ):
     # set the seed
     torch.manual_seed(seed)
@@ -42,16 +43,29 @@ def find_fixed_points(
         state_pts = state_trajs
         idx = torch.randint(n_samples_steps, size=(n_inits,), device=device)
 
-    # Select the initial states
-    states = state_pts[idx]
-    if len(inputs.shape) > 1:
-        inputs = inputs[idx]
+    # Select the initial states - at random time steps for each traj
+    if initial_states is not None:
+        states = state_pts[idx]
     else:
-        inputs = inputs.unsqueeze(0).repeat(n_inits, 1)
+        states = initial_states
+        
+    # adjust dimension of inputs
+    if len(inputs.shape) > 1:
+            inputs = inputs[idx]
+        else:
+            inputs = inputs.unsqueeze(0).repeat(n_inits, 1)
 
     # Add Gaussian noise to the sampled points
     states = states + noise_scale * torch.randn_like(states, device=device)
 
+    # compute the velocity vector at each trajectory point
+    # tau = 0.1
+    # get all points along one trajectory
+    state_for_vel = state_trajs[0, :, :]
+    # print(state_trajs[0, :, :].shape)
+    # print(inputs.shape)
+    velocity_vectors = (model(inputs, state_for_vel) - state_for_vel)/0.1
+    
     # Require gradients for the states
     states = states.detach()
     initial_states = states.detach().cpu().numpy()
@@ -104,8 +118,6 @@ def find_fixed_points(
         n_iters=np.full_like(qstar, iter_count),
     )
 
-    # all_fps.print_summary()
-
     print(f"Found {len(all_fps.xstar)} unique fixed points.")
     if compute_jacobians:
         # Compute the Jacobian for each fixed point
@@ -136,7 +148,7 @@ def find_fixed_points(
             all_fps.J_xstar = dFdx
             all_fps.decompose_jacobians()
 
-            return all_fps
+            return all_fps, velocity_vectors
         else:
             return []
     else:
