@@ -4,11 +4,13 @@ import torch
 
 from ctd.comparison.utils import FixedPoints
 
+# NOTE: # inputs can be a value, that will repeat for all the time steps, 
+# or a tensor of shape that matches input trajs
 
 def find_fixed_points(
     model: pl.LightningModule,
     state_trajs: np.array,
-    inputs: np.array,
+    inputs: np.array,   
     n_inits=1024,
     noise_scale=0.0,
     learning_rate=1e-2,
@@ -17,7 +19,6 @@ def find_fixed_points(
     seed=0,
     compute_jacobians=False,
     report_progress = True,
-    initial_states = None,
 ):
     # set the seed
     torch.manual_seed(seed)
@@ -31,40 +32,29 @@ def find_fixed_points(
     for parameter in model.parameters():
         parameter.requires_grad = False
 
-    # Choose random points along the observed trajectories
+    # Select as many random initial states along trajs as n_inits
     if len(state_trajs.shape) > 2:
         n_samples, n_steps, state_dim = state_trajs.shape
+        # flatten the state trajectories and the inputs
         state_pts = state_trajs.reshape(-1, state_dim)
         if len(inputs.shape) > 1:
             inputs = inputs.reshape(-1, inputs.shape[-1])
         idx = torch.randint(n_samples * n_steps, size=(n_inits,), device=device)
     else:
-        n_samples_steps, state_dim = state_trajs.shape
+        n_steps, state_dim = state_trajs.shape
         state_pts = state_trajs
-        idx = torch.randint(n_samples_steps, size=(n_inits,), device=device)
+        idx = torch.randint(n_steps, size=(n_inits,), device=device)
 
-    # Select the initial states - at random time steps for each traj
-    if initial_states is not None:
-        states = state_pts[idx]
-    else:
-        states = initial_states
-        
-    # adjust dimension of inputs
+
+    # Select as many initial states as n_inits
+    states = state_pts[idx]
     if len(inputs.shape) > 1:
-            inputs = inputs[idx]
-        else:
-            inputs = inputs.unsqueeze(0).repeat(n_inits, 1)
+        inputs = inputs[idx]
+    else:
+        inputs = inputs.unsqueeze(0).repeat(n_inits, 1)
 
     # Add Gaussian noise to the sampled points
     states = states + noise_scale * torch.randn_like(states, device=device)
-
-    # compute the velocity vector at each trajectory point
-    # tau = 0.1
-    # get all points along one trajectory
-    state_for_vel = state_trajs[0, :, :]
-    # print(state_trajs[0, :, :].shape)
-    # print(inputs.shape)
-    velocity_vectors = (model(inputs, state_for_vel) - state_for_vel)/0.1
     
     # Require gradients for the states
     states = states.detach()
@@ -148,7 +138,7 @@ def find_fixed_points(
             all_fps.J_xstar = dFdx
             all_fps.decompose_jacobians()
 
-            return all_fps, velocity_vectors
+            return all_fps
         else:
             return []
     else:

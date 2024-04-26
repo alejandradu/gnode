@@ -268,8 +268,9 @@ class Analysis_TT(Analysis):
         else:
             latents = self.get_latents()
 
-        fps, velocity_vectors = find_fixed_points(
+        fps = find_fixed_points(
             model=self.wrapper.model.cell,
+            #model = self.wrapper.model.generator,
             state_trajs=latents,
             inputs=inputs,
             n_inits=n_inits,
@@ -280,9 +281,8 @@ class Analysis_TT(Analysis):
             seed=seed,
             compute_jacobians=compute_jacobians,
             report_progress = report_progress,
-            initial_states = initial_states,
         )
-        return fps, velocity_vectors
+        return fps
 
     def plot_fps(
         self,
@@ -303,11 +303,10 @@ class Analysis_TT(Analysis):
         report_progress = True,
         return_points = False,
         noiseless=True,
-        initial_states = None,
     ):
 
         latents = self.get_latents().detach().numpy()
-        fps, velocity_vectors = self.compute_FPs(
+        fps = self.compute_FPs(
             noiseless=noiseless,
             inputs=inputs,
             n_inits=n_inits,
@@ -318,7 +317,6 @@ class Analysis_TT(Analysis):
             seed=seed,
             compute_jacobians=compute_jacobians,
             report_progress = report_progress,
-            initial_states = initial_states,
         )
         xstar = fps.xstar
         q_vals = fps.qstar
@@ -414,64 +412,83 @@ class Analysis_TT(Analysis):
             return fps, pca
         
         if return_points:
-            return velocity_vectors, xstar, q_flag, colors
+            return fps, xstar, q_flag, colors
         
         return fps
         
+    # NOTE: input_field can be a single value, where the same value is
+    # applied at every grid point. YET to implement the whole input train,
+    # where idk how to decide what states take the non-zero inputs
+    # NOTE: more modular. Also prob make another function to see
+    # how the space changes when putting in an input
     
-    def plot_velocity_field_non_pca(self, inputs, latents_range, num_points, 
+    def plot_velocity_field_non_pca(analysis, input_field, latents_range, num_points, 
                                     xstar=None, q_flag=None, colors=None, 
                                     num_traj=None, cmap=plt.cm.Reds, 
-                                    return_animation=False, validate_input_val=None):
-        model = self.wrapper.model.cell
+                                    return_animation=False, input_trajectories=None, 
+                                    scatter_trajectories=False, streamline=False):
+    
+        model = analysis.wrapper.model.generator
 
-        # Prepare the state space based on the dimensions in latents_range
-        grid = [np.linspace(range_[0], range_[1], num_points) for range_ in latents_range]
-        mesh = np.meshgrid(*grid, indexing='ij')
-        states = np.stack([ax.ravel() for ax in mesh], axis=-1)
-
-        # Convert numpy array to PyTorch tensor
-        states_tensor = torch.from_numpy(states).float()
-
-        # Calculate F for all states
-        F = model(inputs, states_tensor)  # Assuming model takes only states_tensor as input
-
-        # Compute velocity vectors
-        delta = (F - states_tensor).detach().numpy()
+        # Calculate velocities over a grid using a double for loop implementation
+        x = np.linspace(latents_range[0][0], latents_range[0][1], num_points)
+        y = np.linspace(latents_range[1][0], latents_range[1][1], num_points)
+        if len(latents_range) == 3:
+            z = np.linspace(latents_range[2][0], latents_range[2][1], num_points)
+            
         if len(latents_range) == 2:
-            U, V = delta.T
+            U = np.zeros([num_points, num_points])
+            V = np.zeros([num_points, num_points])
         else:
-            U, V, W = delta.T
-
+            U = np.zeros([num_points, num_points, num_points])
+            V = np.zeros([num_points, num_points, num_points])
+            W = np.zeros([num_points, num_points, num_points])
+            
+        for i in range(num_points):
+            for j in range(num_points):
+                state = torch.tensor([[x[i], y[j]]], dtype=torch.float)
+                if len(latents_range) == 2:
+                    U[i, j], V[i, j] = (model(input_field, state) - state).detach().numpy().flatten()
+                else:
+                    for k in range(num_points):
+                        state = torch.tensor([[x[i], y[j], z[k]]], dtype=torch.float)
+                        U[i, j, k], V[i, j, k], W[i, j, k] = 0.1*(model(input_field, state) - state).detach().numpy().flatten()
+        
         # Create a colormap based on the normalized magnitude
-        magnitude = np.sqrt(np.sum(delta**2, axis=-1))
+        if len(latents_range) == 2:
+            magnitude = np.sqrt(U**2 + V**2)
+        else:
+            magnitude = np.sqrt(U**2 + V**2 + W**2)
         normalized_magnitude = (magnitude - np.min(magnitude)) / (np.max(magnitude) - np.min(magnitude))
         colors_map = cmap(normalized_magnitude.flatten())
 
         # Plot the velocity field
         fig, ax = plt.subplots(figsize=(10, 10))
         if len(latents_range) == 2:
-            ax.quiver(*np.meshgrid(*grid, indexing='ij'), U.reshape(num_points, num_points), V.reshape(num_points, num_points), color=colors_map)
+            ax.quiver(*np.meshgrid(x, y, indexing='ij'), U, V, color=colors_map)
+            #ax.quiver(*np.meshgrid(x, y, indexing='ij'), U, V)
         else:
             ax = fig.add_subplot(111, projection='3d')
-            ax.quiver(*np.meshgrid(*grid, indexing='ij'), W.reshape(num_points, num_points, num_points), V.reshape(num_points, num_points, num_points), U.reshape(num_points, num_points, num_points), color=colors_map)
+            ax.quiver(*np.meshgrid(x, y, z, indexing='ij'), U, V, W, color=colors_map)
             
         # plot trajectories
-        if validate_input_val is not None: 
-            latents = self.get_empty_input_latents(validate_input_val)
+        if input_trajectories: 
+            latents = analysis.get_custom_input_latents(input_trajectories)
         else:
-            latents, colors_target, cmap_target = self.get_latents_noiseless_target_color()
+            latents, colors_target, cmap_target = analysis.get_latents_noiseless_target_color()
             # latents = self.get_latents().detach().numpy()
         colors_time = plt.cm.viridis(np.linspace(0, 1, latents.shape[1]))
         for i in range(num_traj):
-            ax.plot(*latents[i].T, linewidth=0.1, color='black')
+            ax.plot(*latents[i].T, linewidth=0.25, color='black')
             ax.set_xlim(latents_range[0])
             ax.set_ylim(latents_range[1])
-            ax.scatter(*latents[i].T, c=colors_target[i], cmap=cmap_target)
+            if scatter_trajectories:
+                if input_trajectories:
+                    ax.scatter(*latents[i].T)
+                else:
+                    ax.scatter(*latents[i].T, c=colors_target[i], cmap=cmap_target)
         ax.set_xlim(latents_range[0])
         ax.set_ylim(latents_range[1])
-        # ax.legend(handles=handles)
-        
             
         # plot fixed points
         if xstar is not None and q_flag is not None and colors is not None:
@@ -522,10 +539,10 @@ class Analysis_TT(Analysis):
         plt.close(fig)
     
     # get trajectories where input is always value
-    def get_empty_input_latents(self, value):
+    def get_custom_input_latents(self, value):
         ics, inputs, targets = self.get_model_inputs_noiseless()
         # create a new input tensor of the same shape wit value
-        new_inputs = torch.zeros(inputs.shape) * value
+        new_inputs = torch.ones(inputs.shape) * value
         # get the outputs
         out_dict = self.wrapper(ics, new_inputs, targets)
         return out_dict["latents"].detach().numpy()
