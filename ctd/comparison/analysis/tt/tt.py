@@ -109,7 +109,7 @@ class Analysis_TT(Analysis):
         trials, steps, dimension = tt_targets.shape
         
         # Create a color array based on tt_targets
-        color_dict = {-1: 'red', 0: 'green', 1: 'blue'}
+        color_dict = {-1: 'red', 0: 'magenta', 1: 'green'}
         colors = np.array([[color_dict[tt_targets[t,s,0]] for s in range(steps)] for t in range(tt_targets.shape[0])])
 
         # Create a colormap using color_dict
@@ -193,6 +193,7 @@ class Analysis_TT(Analysis):
                 ax3.set_xticks([])
                 ax4.set_xticks([])
 
+        plt.subplots_adjust(hspace=1.5)  # adjust the space between subplots
         plt.suptitle("Task-trained Latent Activity")
         plt.show()
         
@@ -269,8 +270,9 @@ class Analysis_TT(Analysis):
             latents = self.get_latents()
 
         fps = find_fixed_points(
-            model=self.wrapper.model.cell,
-            #model = self.wrapper.model.generator,
+            # NOTE: nODE needs generator, all others cell
+            # model=self.wrapper.model.cell,
+            model = self.wrapper.model.generator,
             state_trajs=latents,
             inputs=inputs,
             n_inits=n_inits,
@@ -319,17 +321,18 @@ class Analysis_TT(Analysis):
             report_progress = report_progress,
         )
         xstar = fps.xstar
-        q_vals = fps.qstar
+        q_vals = fps.qstar   # this has the optimized objective - getting zeros
         is_stable = fps.is_stable
         figQs = plt.figure()
         axQs = figQs.add_subplot(111)
-        axQs.hist(np.log10(q_vals), bins=100)
+        epsilon = 1e-15  # small constant to avoid taking log of zero - threshold should be higher than this
+        axQs.hist(np.log10(q_vals + epsilon), bins=100)
         axQs.set_title("Q* Histogram")
         axQs.set_xlabel("log10(Q*)")
 
         colors = np.zeros((xstar.shape[0], 3))
-        colors[is_stable, :] = np.array([0, 0.3922, 0])  # darkgreen
-        colors[~is_stable, 0] = 0
+        colors[is_stable, :] = np.array([0, 0, 1])
+        colors[~is_stable, 0] = 0  # black
 
         q_flag = q_vals < q_thresh
         if do_pca:
@@ -353,7 +356,7 @@ class Analysis_TT(Analysis):
                         ax.plot(
                             lats_pca[i, :, 0],
                             lats_pca[i, :, 1],
-                            lats_pca[i, :, 2],
+                            lats_pca[i, :, 2], linewidth=0.5,
                         )
             elif n_pca_components == 2:
                 lats_pca = lats_pca.reshape(latents.shape[0], latents.shape[1], 2)
@@ -385,7 +388,7 @@ class Analysis_TT(Analysis):
                         ax.plot(
                             latents[i, :, 0],
                             latents[i, :, 1],
-                            latents[i, :, 2],
+                            latents[i, :, 2],linewidth=0.5,
                         )
             elif xstar.shape[1] == 2:
                 fig, ax = plt.subplots(figsize=(7, 7))
@@ -403,9 +406,15 @@ class Analysis_TT(Analysis):
         
         # Add legend for stability
         ax.plot([], [], "o", color="black", label="Unstable")
-        ax.plot([], [], "o", color="darkgreen", label="Stable")
+        ax.plot([], [], "o", color="blue", label="Stable")
         ax.legend()
         ax.set_title("Fixed Points for Task-Trained")
+        ax.set_xlabel("$m_1$")
+        ax.set_ylabel("$m_2$")
+        if xstar.shape[1] == 3:
+            ax.set_zlabel("$m_3$")
+        ax.set_facecolor('none')
+        ax.grid(False)
         plt.show()
         
         if return_pca_model:
@@ -499,13 +508,6 @@ class Analysis_TT(Analysis):
         
         if return_animation:
             return fig, ax
-        
-    
-    def plot_velocity_field_pca(self, inputs, latents_range, num_points, 
-                                    xstar=None, q_flag=None, colors=None, 
-                                    num_traj=None, cmap=plt.cm.Reds, 
-                                    return_animation=False, validate_input_val=None):
-        pass
         
         
 

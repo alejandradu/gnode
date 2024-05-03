@@ -1,3 +1,9 @@
+# Exploring low-dimensional latent dynamics of neural ODE models trained on simple cognitive tasks
+
+### This repository is a mirror of the Computation-Through-Dynamics Benchmark repository by Chris Versteed. It contains all the code and additions to the previous repository used to deveop the Spring JP. 
+
+Below please find the original description attached to the Computation-Through-Dynamics Benchmark repository, describing its setup and structure.
+
 # Computation-Through-Dynamics Benchmark
 
 ## Overview

@@ -53,6 +53,17 @@ SEARCH_SPACE = dict(
         num_workers=tune.choice([1]),
         n_samples=tune.choice([500]),  
     ),
+    # task parameters
+    env_task=dict(
+        # Task Environment Parameters
+        n=tune.choice([5]),   # DIFFERENT FROM NBFF - this is the average number of clicks per trial
+                                # kim et al use 3-10/182
+    ),
+    # simulation task params
+    env_sim=dict(
+        # Task Environment Parameters
+        n=tune.choice([5]),   # avg clicks per trial
+    ),
 )
 
 # NOTES ON HYPERPARAMS

@@ -11,9 +11,9 @@ from gymnasium import spaces
 from motornet.environment import Environment
 from numpy import ndarray
 from torch._tensor import Tensor
+import textwrap
 
 from ctd.task_modeling.task_env.loss_func import NBFFLoss, RandomTargetLoss
-
 
 class DecoupledEnvironment(gym.Env, ABC):
     """
@@ -167,7 +167,8 @@ class NBitFlipFlop(DecoupledEnvironment):
         ax2.set_ylim(-1.2, 1.2)
         ax2.set_xlabel("Time")
         ax2.set_ylabel("Inputs")
-        plt.tight_layout()
+        plt.figure(dpi=500)
+        #plt.tight_layout(pad=20.0)  # increase padding to 2.0
         plt.show()
         #fig1.savefig("nbitflipflop.pdf")
 
@@ -444,7 +445,7 @@ class OneBitSum(DecoupledEnvironment):
     TODO: for now include bounded and unbounded here, but might need separation
     """
     
-    def __init__(self, n_timesteps: int, noise: float, switch_prob=0.05, transition_blind=1, n=1, limits = (-1, 1), poisson=True):
+    def __init__(self, n_timesteps: int, noise: float, switch_prob=0.05, transition_blind=1, n=1, limits = [-1, 1], poisson=True):
         
         super().__init__(n_timesteps=n_timesteps, noise=noise)
         self.dataset_name = "OneBitSum"
@@ -588,22 +589,26 @@ class OneBitSum(DecoupledEnvironment):
 
         # Plot true_inputs
         axs[0].plot(true_inputs[:,0], color='g')
-        axs[0].set_title("Noiseless Inputs")
+        axs[0].set_ylabel("\n".join(textwrap.wrap("Noiseless Inputs", 12)))
 
         # Plot inputs
         axs[1].plot(inputs[:,0], color='r')
-        axs[1].set_title("Inputs")
-        
+        axs[1].set_ylabel("\n".join(textwrap.wrap("Inputs", 12)))
+
         # Plot accumulated difference
         axs[2].plot(inputs_diff, color='k')
-        axs[2].set_title("Accumulated input sum")
+        axs[2].set_ylabel("\n".join(textwrap.wrap("Accumulated input sum", 12)))
 
         # Plot outputs
         axs[3].plot(outputs[:,0], color='b')
-        axs[3].set_title("Targets")
+        axs[3].set_ylabel("\n".join(textwrap.wrap("Targets", 12)))
 
         # Set the x-label for the last subplot
         axs[3].set_xlabel("Time")
 
+        plt.figure(dpi=500)
         # Display the plot
         plt.show()
+
+        plt.figure(dpi=500)
+        # Display the

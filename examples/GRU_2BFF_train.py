@@ -32,14 +32,14 @@ MODEL = "GRU_RNN"  # Model to train (see configs/model for options)
 SEARCH_SPACE = dict(
     model = dict(
         # check if all models will take this in
-        latent_size = tune.grid_search([128]),   # latent size has a different meaning than in NODE
+        latent_size = tune.grid_search([64]),   # latent size has a different meaning than in NODE
         #layer_hidden_size = tune.grid_search([128]),
         #num_layers = tune.grid_search([3]),
     ),
     task_wrapper=dict(
         # Task Wrapper Parameters
-        weight_decay=tune.grid_search([1e-3]),
-        learning_rate=tune.grid_search([1e-6]),
+        weight_decay=tune.grid_search([1e-6]),
+        learning_rate=tune.grid_search([1e-3]),
     ),
     trainer=dict(
         # Trainer Parameters 

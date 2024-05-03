@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=VanillaRNN_NBFF_train_OBS       # create a short name for your job
+#SBATCH --job-name=VanillaRNN_OBS       # create a short name for your job
 #SBATCH --nodes=1                # node count
 #SBATCH --ntasks=1               # total number of tasks across all nodes
 #SBATCH --cpus-per-task=4        # cpu-cores per task (>1 if multi-threaded tasks)

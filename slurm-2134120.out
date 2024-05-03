@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/ad2002/gnode/examples/NODE_OBS_train.py", line 154, in <module>
+    main(
+  File "/home/ad2002/gnode/examples/NODE_OBS_train.py", line 132, in main
+    RUN_DIR.mkdir(parents=True)
+  File "/home/ad2002/.conda/envs/gnode/lib/python3.10/pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+OSError: [Errno 122] Disk quota exceeded: '/scratch/network/ad2002/content/runs/task-trained/20240429_NODE_OBS_300epoch'

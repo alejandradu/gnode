@@ -4,5 +4,6 @@ n: 20
 n_timesteps: 1000
 noise: 0.00
 switch_prob: 0.05
+limits: [-1, 1]
 
 transition_blind: 1
