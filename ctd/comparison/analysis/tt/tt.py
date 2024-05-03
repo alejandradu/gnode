@@ -258,6 +258,7 @@ class Analysis_TT(Analysis):
         compute_jacobians=True,
         report_progress = True,
         initial_states = None,
+        node=False,
     ):
         # Compute latent activity from task trained model
         if inputs is None and noiseless:
@@ -268,11 +269,14 @@ class Analysis_TT(Analysis):
             latents = self.get_latents()
         else:
             latents = self.get_latents()
+            
+        if node:
+            model = self.wrapper.model.generator
+        else:
+            model = self.wrapper.model.cell
 
         fps = find_fixed_points(
-            # NOTE: nODE needs generator, all others cell
-            # model=self.wrapper.model.cell,
-            model = self.wrapper.model.generator,
+            model = model
             state_trajs=latents,
             inputs=inputs,
             n_inits=n_inits,
@@ -305,6 +309,7 @@ class Analysis_TT(Analysis):
         report_progress = True,
         return_points = False,
         noiseless=True,
+        node=True,   # if True, use generator instance
     ):
 
         latents = self.get_latents().detach().numpy()
@@ -319,13 +324,14 @@ class Analysis_TT(Analysis):
             seed=seed,
             compute_jacobians=compute_jacobians,
             report_progress = report_progress,
+            node=node,
         )
         xstar = fps.xstar
-        q_vals = fps.qstar   # this has the optimized objective - getting zeros
+        q_vals = fps.qstar  
         is_stable = fps.is_stable
         figQs = plt.figure()
         axQs = figQs.add_subplot(111)
-        epsilon = 1e-15  # small constant to avoid taking log of zero - threshold should be higher than this
+        epsilon = 1e-15  # small constant to avoid taking log of zero 
         axQs.hist(np.log10(q_vals + epsilon), bins=100)
         axQs.set_title("Q* Histogram")
         axQs.set_xlabel("log10(Q*)")
@@ -443,7 +449,7 @@ class Analysis_TT(Analysis):
             pass in as an array of one element.
             input_field (torch.tensor): input to calculate F at every point 
             in the grid (the field). 
-            latents_range (list, double): list with each component the 
+            latents_range (list): list with each component the 
             coordinate limits for the grid defining the latent space to plot 
             the flow field.
             num_points (int): number of points along each dimension to get
@@ -577,15 +583,29 @@ class Analysis_TT(Analysis):
         plt.show()
         
 
-    # TODO: probably refactor to get the values of the velocity field
-    # and plots separately
-    def animate_trajectory(self, i, latents_range, num_points, inputs, filename='trajectory_animation.mp4'):
+    def animate_trajectory(self, i, latents_range, num_points, input_field, filename='trajectory_animation.mp4'):
+        """
+        Visualize the trajectory of one trial in the latent space
+        overlayed on the flow field.
+
+        Args:
+            i (int): index of the trajectory to visualize (< num_trials)
+            in training
+            latents_range (list): list with each component the 
+            coordinate limits for the grid defining the latent space to plot 
+            the flow field.
+            num_points (int): number of points along each dimension to get
+            the grid.
+            input_field (torch.tensor): input to calculate F at every point 
+            in the grid (the field). 
+            filename (str, optional): Defaults to 'trajectory_animation.mp4'.
+        """
         # Get the i'th latent trajectory
         latents = self.get_latents().detach().numpy()
         trajectory = latents[i]
 
         # Create a figure and axes
-        fig, ax = self.plot_velocity_field_non_pca(inputs, latents_range, num_points)
+        fig, ax = self.plot_velocity_field_non_pca([self], input_field, latents_range, num_points)
 
         # Create a scatter plot for the trajectory point
         S = ax.scatter(*trajectory[0], color='red')
