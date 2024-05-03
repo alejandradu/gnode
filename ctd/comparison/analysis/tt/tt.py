@@ -424,91 +424,157 @@ class Analysis_TT(Analysis):
             return fps, xstar, q_flag, colors
         
         return fps
-        
-    # NOTE: input_field can be a single value, where the same value is
-    # applied at every grid point. YET to implement the whole input train,
-    # where idk how to decide what states take the non-zero inputs
-    # NOTE: more modular. Also prob make another function to see
-    # how the space changes when putting in an input
+    
     
     def plot_velocity_field_non_pca(analysis, input_field, latents_range, num_points, 
-                                    xstar=None, q_flag=None, colors=None, 
+                                    xstar=None, q_flag=None, colors_fps=None, 
                                     num_traj=None, cmap=plt.cm.Reds, 
-                                    return_animation=False, input_trajectories=None, 
-                                    scatter_trajectories=False, streamline=False):
-    
-        model = analysis.wrapper.model.generator
+                                    input_trajectories=None, 
+                                    scatter_trajectories=False, multiple_models=False):
+        """
+        Plot the flow field of the latent variables of a one or multiple
+        low-dimensional RNN modelswithout PCA. Works for models with 
+        latent size = 2, 3. Returns one plot overlaying the results, if
+        multiple models are passed in the arguments.
 
-        # Calculate velocities over a grid using a double for loop implementation
-        x = np.linspace(latents_range[0][0], latents_range[0][1], num_points)
-        y = np.linspace(latents_range[1][0], latents_range[1][1], num_points)
-        if len(latents_range) == 3:
-            z = np.linspace(latents_range[2][0], latents_range[2][1], num_points)
-            
-        if len(latents_range) == 2:
-            U = np.zeros([num_points, num_points])
-            V = np.zeros([num_points, num_points])
-        else:
-            U = np.zeros([num_points, num_points, num_points])
-            V = np.zeros([num_points, num_points, num_points])
-            W = np.zeros([num_points, num_points, num_points])
-            
-        for i in range(num_points):
-            for j in range(num_points):
-                state = torch.tensor([[x[i], y[j]]], dtype=torch.float)
-                if len(latents_range) == 2:
-                    U[i, j], V[i, j] = (model(input_field, state) - state).detach().numpy().flatten()
-                else:
-                    for k in range(num_points):
-                        state = torch.tensor([[x[i], y[j], z[k]]], dtype=torch.float)
-                        U[i, j, k], V[i, j, k], W[i, j, k] = 0.1*(model(input_field, state) - state).detach().numpy().flatten()
+        Args:
+            analysis (list, Analysis_TT): list of Analysis_TT objects of one 
+            or more models with the same latent dimension. Even if one model, 
+            pass in as an array of one element.
+            input_field (torch.tensor): input to calculate F at every point 
+            in the grid (the field). 
+            latents_range (list, double): list with each component the 
+            coordinate limits for the grid defining the latent space to plot 
+            the flow field.
+            num_points (int): number of points along each dimension to get
+            the grid.
+            xstar (list): each element is an array specifying the fixed points 
+            for the trajectories in each model. Objects returned by plot_fps()
+            q_flag (list): each elements is an array with the same shape 
+            as q_star, marking with 1's the valid fixed points. Object
+            returned by plot_fps()
+            colors_fps (list): each element is an array indicating the color
+            code for the fixed points depending on their stability. 
+            Object returned by plot_fps()
+            num_traj (int): number of trajectories to plot
+            over the flow field, obtained from the trials done during
+            training (and with that input).
+            cmap (plt.cm): colormap object to plot the flow field, depending
+            on the magnitude of the velocity at every point.
+            input_trajectories (list): each element is an array with 
+            trajectories for a specific inputs. Especially useful when
+            wanting to verify that the trajectories follow the flow
+            field for a given input_field. Object returned by functions
+            like get_latents()
+            scatter_trajectories (bool, optional): if True, states visited
+            by the trajectories are shown as points, apart from 
+            connecting the trajectories with lines.
+            multiple_models (bool, optional): if True, overlays then fields,
+            and trajectories and fixed points (if given) with increasing
+            red color intensity.
+        """
         
-        # Create a colormap based on the normalized magnitude
-        if len(latents_range) == 2:
-            magnitude = np.sqrt(U**2 + V**2)
-        else:
-            magnitude = np.sqrt(U**2 + V**2 + W**2)
-        normalized_magnitude = (magnitude - np.min(magnitude)) / (np.max(magnitude) - np.min(magnitude))
-        colors_map = cmap(normalized_magnitude.flatten())
-
-        # Plot the velocity field
-        fig, ax = plt.subplots(figsize=(10, 10))
-        if len(latents_range) == 2:
-            ax.quiver(*np.meshgrid(x, y, indexing='ij'), U, V, color=colors_map)
-            #ax.quiver(*np.meshgrid(x, y, indexing='ij'), U, V)
-        else:
-            ax = fig.add_subplot(111, projection='3d')
-            ax.quiver(*np.meshgrid(x, y, z, indexing='ij'), U, V, W, color=colors_map)
+        fig, ax = plt.subplots(figsize=(15, 15))
+        
+        if multiple_models:
+            cmulti = plt.cm.Reds(np.linspace(0.35, 0.8, len(analysis))) 
+        
+        for index, a in enumerate(analysis):
+            model = a.wrapper.model.generator
+    
+            # Calculate velocities over a grid using a double for loop implementation
+            x = np.linspace(latents_range[0][0], latents_range[0][1], num_points)
+            y = np.linspace(latents_range[1][0], latents_range[1][1], num_points)
+            if len(latents_range) == 3:
+                z = np.linspace(latents_range[2][0], latents_range[2][1], num_points)
+                
+            if len(latents_range) == 2:
+                U = np.zeros([num_points, num_points])
+                V = np.zeros([num_points, num_points])
+            else:
+                U = np.zeros([num_points, num_points, num_points])
+                V = np.zeros([num_points, num_points, num_points])
+                W = np.zeros([num_points, num_points, num_points])
+                
+            for i in range(num_points):
+                for j in range(num_points):
+                    state = torch.tensor([[x[i], y[j]]], dtype=torch.float)
+                    if len(latents_range) == 2:
+                        U[i, j], V[i, j] = (model(input_field, state) - state).detach().numpy().flatten()
+                    else:
+                        for k in range(num_points):
+                            state = torch.tensor([[x[i], y[j], z[k]]], dtype=torch.float)
+                            U[i, j, k], V[i, j, k], W[i, j, k] = 0.1*(model(input_field, state) - state).detach().numpy().flatten()
             
-        # plot trajectories
-        if input_trajectories: 
-            latents = analysis.get_custom_input_latents(input_trajectories)
-        else:
-            latents, colors_target, cmap_target = analysis.get_latents_noiseless_target_color()
-            # latents = self.get_latents().detach().numpy()
-        colors_time = plt.cm.viridis(np.linspace(0, 1, latents.shape[1]))
-        for i in range(num_traj):
-            ax.plot(*latents[i].T, linewidth=0.25, color='black')
+            # Create a colormap based on the normalized magnitude
+            if len(latents_range) == 2:
+                magnitude = np.sqrt(U**2 + V**2)
+            else:
+                magnitude = np.sqrt(U**2 + V**2 + W**2)
+            normalized_magnitude = (magnitude - np.min(magnitude)) / (np.max(magnitude) - np.min(magnitude))
+            colors_map = cmap(normalized_magnitude.flatten())
+    
+            # Plot the velocity field
+            if len(latents_range) == 2:
+                if multiple_models:
+                    ax.quiver(*np.meshgrid(x, y, indexing='ij'), U, V, color=cmulti[index])
+                else:
+                    ax.quiver(*np.meshgrid(x, y, indexing='ij'), U, V, color=colors_map)
+                #ax.quiver(*np.meshgrid(x, y, indexing='ij'), U, V)
+            else:
+                ax = fig.add_subplot(111, projection='3d')
+                if multiple_models:  # scale up to magnify differences
+                    ax.quiver(*np.meshgrid(x, y, z, indexing='ij'), U*100, V*100, W*100, color=cmulti[index])
+                else:
+                    ax.quiver(*np.meshgrid(x, y, z, indexing='ij'), U, V, W, color=colors_map)
+            
+            # plot trajectories
+            if input_trajectories: 
+                latents = a.get_custom_input_latents(input_trajectories)
+            else:
+                latents, colors_target, cmap_target = a.get_latents_noiseless_target_color()
+                # latents = self.get_latents().detach().numpy()
+            colors_time = plt.cm.viridis(np.linspace(0, 1, latents.shape[1]))
+            for i in range(num_traj):
+                if multiple_models:
+                    ax.plot(*latents[i].T, linewidth=0.25, color=cmulti[index])
+                else:
+                    ax.plot(*latents[i].T, linewidth=0.25, color='black')
+                ax.set_xlim(latents_range[0])
+                ax.set_ylim(latents_range[1])
+                if scatter_trajectories:
+                    if input_trajectories:
+                        if multiple_models:
+                            ax.scatter(*latents[i].T, s=7, color=cmulti[index])
+                        else:
+                            ax.scatter(*latents[i].T, s=7)
+                    else:
+                        if multiple_models:
+                            ax.scatter(*latents[i].T, s=7, color=cmulti[index])
+                        else:
+                            ax.scatter(*latents[i].T, s=7, c=colors_target[i], cmap=cmap_target)
             ax.set_xlim(latents_range[0])
             ax.set_ylim(latents_range[1])
-            if scatter_trajectories:
-                if input_trajectories:
-                    ax.scatter(*latents[i].T)
+                
+            # plot fixed points
+            if xstar[index] is not None and q_flag[index] is not None and colors_fps[index] is not None:
+                xstar2 = xstar[index]
+                colors2 = colors_fps[index]
+                q_flag2 = q_flag[index]
+                if multiple_models:   # still have to include difference in stability
+                    ax.scatter(*xstar2[q_flag2].T, color=cmulti[index])
                 else:
-                    ax.scatter(*latents[i].T, c=colors_target[i], cmap=cmap_target)
-        ax.set_xlim(latents_range[0])
-        ax.set_ylim(latents_range[1])
-            
-        # plot fixed points
-        if xstar is not None and q_flag is not None and colors is not None:
-            ax.scatter(*xstar[q_flag].T, c=colors[q_flag, :])
-
+                    ax.scatter(*xstar2[q_flag2].T, c=colors2[q_flag2, :])
+    
         ax.set_title("Latent Velocity Field")
+        ax.set_ylabel("$m_2$", fontsize=25)
+        ax.set_xlabel("$m_1$", fontsize=25)
+        plt.rcParams['xtick.labelsize'] = 15
+        plt.rcParams['ytick.labelsize'] = 15
+        if multiple_models:
+            ax.set_zlabel("$m_3$", fontsize=25)
+            ax.set_zlim(latents_range[2])
         plt.show()
-        
-        if return_animation:
-            return fig, ax
-        
         
 
     # TODO: probably refactor to get the values of the velocity field

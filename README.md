@@ -30,7 +30,7 @@ Text files with the train/test loss and other metrics for training runs of the m
 
 7. examples/task_training_scripts
 
-Scripts used to train the models and perform hyperparameter sweeps. This is the most "top-level" script of the repository meant for general users to modify.
+Scripts used to train the models and perform hyperparameter sweeps. This is the most "top-level" script of the repository meant for general users to modify. WandB logging is disabled.
 
 Apart from the configuration "configs" file, all other components of the repository remain identical to Versteeg's version on March 11, 2024.
 
