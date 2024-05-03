@@ -4,9 +4,35 @@
 
 The relevant components to the JP are:
  
- 1. Exa
+ 1. examples/task_training_notebooks
 
- ctd/comparison/analysis/tt/tt.py
+ This contains three notebooks used to analyze the task-trained models. OBS_NBFF.ipynb contains the figures presented in the JP and code to produce different visualizations of the latent spaces of the models (trajectores, flow fields). tt_models.ipynb and tt_models2.ipynb contains other code in development and past figures that were not included in the JP (and need more development).
+
+ 2. ctd/comparison/analysis/tt/tt.py
+
+Main script that builds the Analysis class, where we added functions to obtain the flow field of low dimensional models and modified existing ones to produce plots in both 2D and 3D. 
+
+ 3. ctd/task_modeling/task_env/task_env.py
+
+ Script that defines the task environments using OpenAI Gym library. Our implementation of OneBitSum can be found here. Other config and task wrapper files had to be modified to include the new task, but this is the relevant script that defines its behavior.
+
+ 4. ctd/task_modeling/model/node.py and ctd/task_modeling/model/rnn.py
+
+ Implementation of NODE, Vanilla RNN, and GRU using PyTorch, as originally written by Chris Versteeg. 
+
+ 5. ctd/comparison/fixedpoints.py
+
+Fixed point finder algorithm that performs the optimization of the (scalar) velocity of the model, as originally written by Chris Versteeg. Uses the FixedPoints class written by Matt Golub.
+
+6. examples/task_training_metrics
+
+Text files with the train/test loss and other metrics for training runs of the models. It also contains the shell scripts used to extract the metrics from the training output (that is saved to a directory in the remote clusters, as originally designed by Chris Versteeg)
+
+7. examples/task_training_scripts
+
+Scripts used to train the models and perform hyperparameter sweeps. This is the most "top-level" script of the repository meant for general users to modify.
+
+Apart from the configuration "configs" file, all other components of the repository remain identical to Versteeg's version on March 11, 2024.
 
 
 Below please find the original description attached to the Computation-Through-Dynamics Benchmark repository, describing its setup and structure.

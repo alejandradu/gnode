@@ -440,9 +440,14 @@ class OneBitSum(DecoupledEnvironment):
     """
     An environment for a 2-bit memory task.
     The output bit is the sign of the sum of all previous pulses.
-    TODO: note that the input/output dimensions are fixed and 
-    for any new task they have to match
-    TODO: for now include bounded and unbounded here, but might need separation
+    
+    noise: float, the standard deviation of the noise to add to the inputs
+    switch_prob: float, the probability of a bit flipping (if not Poisson, like NBFF)
+    transition_blind: int, the number of timesteps to ignore after a transition
+    limits: list, the limits of the sum (default is [-1, 1])
+    n: int, the number of pulses to send in a trial (average number of poisson)
+    poisson: bool, whether to use a poisson process for the pulses (NBFF bit flipping otherwise)
+    
     """
     
     def __init__(self, n_timesteps: int, noise: float, switch_prob=0.05, transition_blind=1, n=1, limits = [-1, 1], poisson=True):
