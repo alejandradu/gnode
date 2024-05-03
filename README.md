@@ -6,7 +6,7 @@ The relevant components to the JP are:
  
  1. examples/task_training_notebooks
 
- This contains three notebooks used to analyze the task-trained models. OBS_NBFF.ipynb contains the figures presented in the JP and code to produce different visualizations of the latent spaces of the models (trajectores, flow fields). tt_models.ipynb and tt_models2.ipynb contains other code in development and past figures that were not included in the JP (and need more development).
+ This contains three notebooks used to analyze the task-trained models and produce the figures presented in the JP. OBS_NBFF.ipynb contains the analysis pertinent to 2D flow fields for OBS and 2-3BFF. tt_models2.ipynb has the analysis of model training and the loss curves. It also contains some preliminary experiments implementing OBS. tt_models.ipynb contains other code in development and past figures that were not included in the JP (and need more development).
 
  2. ctd/comparison/analysis/tt/tt.py
 
