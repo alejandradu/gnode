@@ -21,6 +21,12 @@ class NODE(nn.Module):
         self.cell = None
         self.generator = None
         self.readout = None
+        self.latent_ics = torch.nn.Parameter(
+            torch.zeros(latent_size), requires_grad=True
+        )
+
+    def init_hidden(self, batch_size):
+        return self.latent_ics.unsqueeze(0).expand(batch_size, -1)
 
     def init_model(self, input_size, output_size):
         self.input_size = input_size
@@ -30,6 +36,11 @@ class NODE(nn.Module):
         )
         self.generator = MLPCell(input_size, self.num_layers, self.layer_hidden_size, self.latent_size)
         self.readout = nn.Linear(self.latent_size, output_size)
+        # Initialize weights and biases for the readout layer
+        nn.init.normal_(
+            self.readout.weight, mean=0.0, std=0.01
+        )  # Small standard deviation
+        nn.init.constant_(self.readout.bias, 0.0)  # Zero bias initialization
 
     def forward(self, inputs, hidden=None):
         n_samples, n_inputs = inputs.shape

@@ -1,19 +1,19 @@
 # Class to generate training data for task-trained RNN that does 3 bit memory task
 from abc import ABC, abstractmethod
-from typing import Any
 
 import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
-import torch.nn as nn
 from gymnasium import spaces
+<<<<<<< HEAD
 from motornet.environment import Environment
 from numpy import ndarray
 from torch._tensor import Tensor
 import textwrap
+=======
+>>>>>>> upstream/main
 
-from ctd.task_modeling.task_env.loss_func import NBFFLoss, RandomTargetLoss
+from ctd.task_modeling.task_env.loss_func import NBFFLoss
 
 class DecoupledEnvironment(gym.Env, ABC):
     """
@@ -69,7 +69,13 @@ class NBitFlipFlop(DecoupledEnvironment):
     """
 
     def __init__(
-        self, n_timesteps: int, noise: float, n=1, switch_prob=0.01, transition_blind=4
+        self,
+        n_timesteps: int,
+        noise: float,
+        n=1,
+        switch_prob=0.01,
+        transition_blind=4,
+        dynamic_noise=0,
     ):
         super().__init__(n_timesteps=n_timesteps, noise=noise)
         self.dataset_name = f"{n}BFF"
@@ -85,6 +91,7 @@ class NBitFlipFlop(DecoupledEnvironment):
         self.input_labels = [f"Input {i}" for i in range(n)]
         self.output_labels = [f"Output {i}" for i in range(n)]
         self.noise = noise
+        self.dynamic_noise = dynamic_noise
         self.coupled_env = False
         self.switch_prob = switch_prob
         self.transition_blind = transition_blind
@@ -151,7 +158,8 @@ class NBitFlipFlop(DecoupledEnvironment):
             # No extra info for this task, so just fill with zeros
             "extra": np.zeros(shape=(n_samples, 1)),
         }
-        return dataset_dict
+        extra_dict = {}
+        return dataset_dict, extra_dict
 
     def render(self):
         inputs, states, _ = self.generate_trial()
@@ -187,6 +195,7 @@ class NBitFlipFlop(DecoupledEnvironment):
                 ax.set_title(f"Trial {i+1}")
             plt.tight_layout()
             plt.show()
+<<<<<<< HEAD
 
 
 class RandomTarget(Environment):
@@ -617,3 +626,5 @@ class OneBitSum(DecoupledEnvironment):
 
         plt.figure(dpi=500)
         # Display the
+=======
+>>>>>>> upstream/main

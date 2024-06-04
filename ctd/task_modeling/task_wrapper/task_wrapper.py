@@ -41,6 +41,7 @@ class TaskTrainedWrapper(pl.LightningModule):
 
         """
         super().__init__()
+        self.save_hyperparameters()
         self.task_env = task_env
         self.model = model
         self.input_size = input_size
@@ -61,6 +62,10 @@ class TaskTrainedWrapper(pl.LightningModule):
         self.loss_func = task_env.loss_func
         if hasattr(task_env, "state_label"):
             self.state_label = task_env.state_label
+        if hasattr(task_env, "dynamic_noise"):
+            self.dynamic_noise = task_env.dynamic_noise
+        else:
+            self.dynamic_noise = 0.0
 
     def set_model(self, model: nn.Module):
         """Set the model for the training pipeline"""
@@ -75,6 +80,22 @@ class TaskTrainedWrapper(pl.LightningModule):
             weight_decay=self.weight_decay,
         )
         return optimizer
+
+    def forward_step_coupled(self, env_states, context_inputs, rnn_hidden, joint_state):
+        """Forward step for coupled environment combining the RNN and environment"""
+        # model takes in:
+        # - inputs: composed of env_states and context_inputs
+        # - rnn_hidden: hidden state of the RNN
+        inputs = torch.hstack((env_states, context_inputs))
+        action, rnn_hidden = self.model(inputs, rnn_hidden)
+        self.task_env.reset(
+            batch_size=env_states.shape[0], options={"ic_state": joint_state}
+        )
+        env_states, _, terminated, _, info = self.task_env.step(
+            action=action, inputs=context_inputs
+        )
+        joint_state = info["states"]["joint"]
+        return action, rnn_hidden, env_states, joint_state
 
     def forward(self, ics, inputs, inputs_to_env=None):
         """Pass data through the model
@@ -122,6 +143,10 @@ class TaskTrainedWrapper(pl.LightningModule):
             else:
                 model_input = inputs[:, count, :]
 
+            if self.dynamic_noise > 0:
+                model_input = (
+                    model_input + torch.randn_like(model_input) * self.dynamic_noise
+                )
             # Produce an action and a hidden state
             action, hidden = self.model(model_input, hidden)
 
@@ -195,6 +220,9 @@ class TaskTrainedWrapper(pl.LightningModule):
 
         # Compute the loss using the loss function object
         loss_all = self.loss_func(loss_dict)
+        # If self.model has a loss function, add it to the loss
+        if hasattr(self.model, "model_loss"):
+            loss_all += self.model.model_loss(loss_dict)
         self.log("train/loss", loss_all)
         return loss_all
 
@@ -223,5 +251,7 @@ class TaskTrainedWrapper(pl.LightningModule):
 
         # Compute the loss using the loss function object
         loss_all = self.loss_func(loss_dict)
+        if hasattr(self.model, "model_loss"):
+            loss_all += self.model.model_loss(loss_dict)
         self.log("valid/loss", loss_all)
         return loss_all

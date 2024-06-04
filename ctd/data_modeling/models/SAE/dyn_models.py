@@ -4,6 +4,8 @@ from torch import nn
 
 from ctd.data_modeling.models.SAE.readouts import FeedForwardNet, FlowReadout
 
+from .loss_func import LossFunc, PoissonLossFunc
+
 
 class RNN(nn.Module):
     def __init__(self, cell):
@@ -59,6 +61,7 @@ class NODELatentSAE(pl.LightningModule):
         epochs_per_group: int,
         vf_hidden_size: int,
         vf_num_layers: int,
+        loss_func: LossFunc = PoissonLossFunc(),
     ):
         super().__init__()
         # Instantiate bidirectional GRU encoder
@@ -115,17 +118,18 @@ class NODELatentSAE(pl.LightningModule):
         vector_field_net = nn.Sequential(*vector_field)
         self.decoder = RNN(MLPCell(vector_field_net, input_size))
 
+        self.loss_func = loss_func
+
     def forward(self, data, inputs):
         # Pass data through the model
         _, h_n = self.encoder(data[:, : self.hparams.encoder_window, :])
         h_n = torch.cat([*h_n], -1)
         h_n_drop = self.dropout(h_n)
         ic = self.ic_linear(h_n_drop)
-        ic_drop = self.dropout(ic)
         if self.inv_encoder:
-            ic_drop = self.readout(ic_drop, reverse=True)
+            ic = self.readout(ic, reverse=True)
         # Evaluate the NeuralODE
-        latents, _ = self.decoder(inputs, ic_drop)
+        latents, _ = self.decoder(inputs, ic)
         B, T, N = latents.shape
         # Map decoder state to data dimension
         rates = self.readout(latents)
@@ -155,14 +159,18 @@ class NODELatentSAE(pl.LightningModule):
         return optimizer
 
     def training_step(self, batch, batch_ix):
-        spikes, recon_spikes, inputs, *_ = batch
+
+        spikes, recon_spikes, inputs, extra, *_ = batch
         # Pass data through the model
         pred_logrates, pred_latents = self.forward(spikes, inputs)
 
         # Compute the weighted loss
-        loss_nll = self.loss_func(pred_logrates, recon_spikes, inputs)
-
-        loss_all_train = torch.mean(loss_nll)
+        loss_dict = dict(
+            controlled=pred_logrates,
+            targets=recon_spikes,
+            extra=extra,
+        )
+        loss_all_train = self.loss_func(loss_dict)
         self.log("train/loss_all_train", loss_all_train)
 
         return loss_all_train
@@ -177,11 +185,17 @@ class NODELatentSAE(pl.LightningModule):
             pred_logrates = pred_logrates[:, :n_obs, :n_heldin]
             recon_spikes = spikes
         else:
-            spikes, recon_spikes, inputs, *_ = batch
+            spikes, recon_spikes, inputs, extra, *_ = batch
             # Pass data through the model
             pred_logrates, latents = self.forward(spikes, inputs)
 
-        loss = self.loss_fun(pred_logrates, recon_spikes, inputs)
+        loss_dict = dict(
+            controlled=pred_logrates,
+            targets=recon_spikes,
+            extra=extra,
+        )
+
+        loss = self.loss_func(loss_dict)
         self.log("valid/loss_all", loss)
 
         return loss

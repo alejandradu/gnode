@@ -27,30 +27,38 @@ LOCAL_MODE = False
 OVERWRITE = True
 WANDB_LOGGING = True
 
-RUN_DESC = "NBFF_GRU_RNN_DT_test"
+RUN_DESC = "GRU_ExtInputs_RandomTarget_Final_Sweep"
 NUM_SAMPLES = 1
 MODEL_CLASS = "SAE"  # "LFADS" or "SAE"
-MODEL = "GRU_RNN"
-DATA = "NBFF"
+MODEL = "GRU_RNN"  # "ResLFADS" or "LFADS"
+DATA = "RandomTarget"  # "NBFF", "RandomTarget" or "MultiTask
+GEN_MODEL = "NoisyGRU_RNN"
 INFER_INPUTS = False
 
-prefix = "20240229_3BFF_GRU_Tutorial"
-
+if GEN_MODEL == "NoisyGRU_RNN":
+    if DATA == "NBFF":
+        prefix = "20240503_Fig1_NBFF_NoisyGRU"
+    elif DATA == "RandomTarget":
+        prefix = "20240529_RandomTarget_NoisyGRU_Memory"
+    elif DATA == "MultiTask":
+        prefix = "20240513_MultiTask_NoisyGRU_Final"
+elif GEN_MODEL == "NODE":
+    if DATA == "NBFF":
+        prefix = "20240503_Fig1_NBFF_NODE"
 # -------------------------------------
 SEARCH_SPACE = dict(
-    # model=dict(
-    #     num_batches=tune.grid_search([200]),
-    # ),
     datamodule=dict(
-        gen_model=tune.grid_search(["GRU_RNN"]),
         # Change the prefix to the correct path for your task-trained network
         prefix=tune.grid_search([prefix]),
     ),
     params=dict(
-        seed=tune.grid_search([0]),
+        seed=tune.grid_search([0, 1, 2, 3, 4]),
     ),
     trainer=dict(
-        max_epochs=tune.grid_search([1]),
+        max_epochs=tune.grid_search([1000]),
+    ),
+    model=dict(
+        latent_size=tune.grid_search([10, 20, 30, 40, 50]),
     ),
 )
 
@@ -130,7 +138,7 @@ def main(
             train, run_tag=run_tag_in, config_dict=config_dict, path_dict=path_dict
         ),
         config=SEARCH_SPACE,
-        resources_per_trial=dict(cpu=10, gpu=1),
+        resources_per_trial=dict(cpu=4, gpu=0.9),
         num_samples=NUM_SAMPLES,
         local_dir=run_dir,
         search_alg=BasicVariantGenerator(),

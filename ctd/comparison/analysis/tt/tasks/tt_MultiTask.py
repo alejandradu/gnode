@@ -8,34 +8,60 @@ from ctd.comparison.fixedpoints import find_fixed_points
 
 
 class Analysis_TT_MultiTask(Analysis_TT):
-    def __init__(self, run_name, filepath):
+    def __init__(self, run_name, filepath, use_train_dm=False):
         # initialize superclass
         super().__init__(run_name, filepath)
         self.tt_or_dt = "tt"
-        self.load_wrapper(filepath)
+        self.load_wrapper(filepath, use_train_dm)
         self.plot_path = (
-            "/home/csverst/Github/InterpretabilityBenchmark/"
-            f"interpretability/comparison/plots/{self.run_name}/"
+            "/home/csverst/Github/CtDBenchmark/"
+            f"ctd/comparison/plots/{self.run_name}/"
         )
 
-    def get_task_flag(self, task_to_analyze):
+    def get_task_flag(self, task_to_analyze, phase="all"):
         # Compute latent activity from task trained model
-        task_list = self.datamodule.all_data["task_names"]
-        phase_dict = self.datamodule.all_data["phase_dict"]
+        task_list = self.datamodule.extra_data["task_names"]
+        phase_dict = self.datamodule.extra_data["phase_dict"]
+
+        train_inds = self.datamodule.train_ds.tensors[3].detach().numpy().astype(int)
+        valid_inds = self.datamodule.valid_ds.tensors[3].detach().numpy().astype(int)
+        all_inds = np.concatenate([train_inds, valid_inds])
+        if phase == "all":
+            inds = all_inds
+        elif phase == "train":
+            inds = train_inds
+        elif phase == "val":
+            inds = valid_inds
+
+        task_list = [task_list[ind] for ind in inds]
+        phase_dict = [phase_dict[ind] for ind in inds]
+
         task_flag = [task == task_to_analyze for task in task_list]
-        phase_task = [d for d, t in zip(phase_dict, task_flag) if t]
-        return task_flag, phase_task
+        phase_dict = [phase_dict[i] for i in range(len(phase_dict)) if task_flag[i]]
+        return task_flag, phase_dict
 
-    def get_model_inputs_noiseless(self):
-        all_data = self.datamodule.all_data
-        tt_ics = torch.Tensor(all_data["ics"])
-        tt_inputs = torch.Tensor(all_data["true_inputs"])
-        tt_targets = torch.Tensor(all_data["targets"])
-        return tt_ics, tt_inputs, tt_targets
+    def get_model_inputs_noiseless(self, phase="all"):
+        tt_ics, tt_inputs, tt_targets = self.get_model_inputs(phase=phase)
 
-    def get_model_outputs_noiseless(self):
-        tt_ics, tt_inputs, tt_targets = self.get_model_inputs_noiseless()
+        train_noiseless_inputs = self.datamodule.train_ds.tensors[7]
+        valid_noiseless_inputs = self.datamodule.valid_ds.tensors[7]
+        tt_noiseless_inputs = torch.cat(
+            [train_noiseless_inputs, valid_noiseless_inputs], dim=0
+        )
+
+        if phase == "all":
+            return tt_ics, tt_noiseless_inputs, tt_targets
+        elif phase == "train":
+            return tt_ics, train_noiseless_inputs, tt_targets
+        elif phase == "val":
+            return tt_ics, valid_noiseless_inputs, tt_targets
+
+    def get_model_outputs_noiseless(self, phase="all"):
+        tt_ics, tt_inputs, tt_targets = self.get_model_inputs_noiseless(phase=phase)
+        dyn_noise = self.wrapper.dynamic_noise
+        self.wrapper.dynamic_noise = 0.0
         out_dict = self.wrapper(tt_ics, tt_inputs, tt_targets)
+        self.wrapper.dynamic_noise = dyn_noise
         return out_dict
 
     def get_data_from_phase(self, phase_task, phase, data):
@@ -54,24 +80,23 @@ class Analysis_TT_MultiTask(Analysis_TT):
         noise_scale=0.1,
         max_iters=50000,
         n_inits=2048,
-        use_noisy=False,
+        use_noisy=True,
     ):
         # Compute latent activity from task trained model
-        task_flag, phase_task = self.get_task_flag(task_to_analyze)
-        tt_ics, tt_inputs, tt_targets = self.get_model_inputs()
-        true_inputs = torch.Tensor(self.datamodule.all_data["true_inputs"])
+        task_flag, phase_task = self.get_task_flag(task_to_analyze, phase="val")
+        tt_ics, tt_inputs, tt_targets = self.get_model_inputs(phase="val")
+        true_inputs = self.get_true_inputs(phase="val")
 
         tt_ics = tt_ics[task_flag]
         tt_inputs = tt_inputs[task_flag]
         tt_targets = tt_targets[task_flag]
         true_inputs = true_inputs[task_flag]
         if use_noisy:
-            inputs_fp = tt_inputs
+            out_dict = self.get_model_outputs(phase="val")
         else:
-            inputs_fp = true_inputs
-
-        out_dict = self.wrapper(tt_ics, inputs_fp, tt_targets)
+            out_dict = self.get_model_outputs_noiseless(phase="val")
         latents = out_dict["latents"]
+        latents = latents[task_flag]
 
         lats_phase = []
         inputs_phase = []
@@ -123,7 +148,7 @@ class Analysis_TT_MultiTask(Analysis_TT):
         task_flag, phase_task = self.get_task_flag(task)
 
         tt_ics, tt_inputs, tt_targets = self.get_model_inputs()
-        true_inputs = torch.Tensor(self.datamodule.all_data["true_inputs"])
+        true_inputs = self.get_true_inputs()
 
         tt_ics = tt_ics[task_flag]
         tt_inputs = tt_inputs[task_flag]
@@ -136,6 +161,7 @@ class Analysis_TT_MultiTask(Analysis_TT):
 
         out_dict = self.wrapper(tt_ics, inputs_fp, tt_targets)
         latents = out_dict["latents"]
+        # latents = latents[task_flag]
         true_inputs_1 = true_inputs[0, phase_task[0][phase1][0], :]
         true_inputs_2 = true_inputs[0, phase_task[0][phase2][0], :]
 
@@ -205,7 +231,7 @@ class Analysis_TT_MultiTask(Analysis_TT):
         ax.set_xlim([-2, 2])
         ax.set_ylim([-2, 2])
         ax.set_zlim([-2, 2])
-        plt.savefig(self.plot_path + f"fps_{task}_{phase1}_{phase2}.png", dpi=300)
+        plt.savefig(f"fps_{task}_{phase1}_{phase2}.png", dpi=300)
         print(len(interp_fps))
         return interp_fps
 
@@ -226,7 +252,7 @@ class Analysis_TT_MultiTask(Analysis_TT):
         task_flag_2, phase_task_2 = self.get_task_flag(task2)
 
         tt_ics, tt_inputs, tt_targets = self.get_model_inputs()
-        true_inputs = torch.Tensor(self.datamodule.all_data["true_inputs"])
+        true_inputs = self.get_true_inputs()
 
         ics_1 = tt_ics[task_flag_1]
         inputs_1 = tt_inputs[task_flag_1]
@@ -353,9 +379,7 @@ class Analysis_TT_MultiTask(Analysis_TT):
                     ax.set_xlabel("qstar")
                     ax.set_ylabel("Count")
                     ax.set_title(f"qstar for {task_to_analyze} {phase}")
-                plt.savefig(
-                    self.plot_path + f"qstar_{task_to_analyze}_{phase}.png", dpi=300
-                )
+                plt.savefig(f"qstar_{task_to_analyze}_{phase}.png", dpi=300)
 
         # window to only FPs whose q values are less than thresh
         thresh = 1e-5
@@ -389,15 +413,13 @@ class Analysis_TT_MultiTask(Analysis_TT):
             ax.set_ylim([-2, 2])
             ax.set_zlim([-2, 2])
 
-        plt.savefig(
-            self.plot_path + f"LatentTraj_{task_to_analyze}_{phase}.png", dpi=300
-        )
+        plt.savefig(f"LatentTraj_{task_to_analyze}_{phase}.png", dpi=300)
 
     def plot_task_trial(self, task, num_trials):
         task_flag_1, phase_task_1 = self.get_task_flag(task)
 
         tt_ics, tt_inputs, tt_targets = self.get_model_inputs()
-        true_inputs = torch.Tensor(self.datamodule.all_data["true_inputs"])
+        true_inputs = self.get_true_inputs()
 
         ics = tt_ics[task_flag_1]
         inputs = tt_inputs[task_flag_1]

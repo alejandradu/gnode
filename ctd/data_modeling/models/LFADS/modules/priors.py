@@ -1,13 +1,6 @@
 import torch
 from torch import nn
-from torch.distributions import (
-    Bernoulli,
-    Independent,
-    Laplace,
-    Normal,
-    StudentT,
-    kl_divergence,
-)
+from torch.distributions import Independent, Normal, StudentT, kl_divergence
 from torch.distributions.transforms import AffineTransform
 
 
@@ -121,55 +114,4 @@ class MultivariateStudentT(nn.Module):
         log_q = posterior.log_prob(sample)
         log_p = prior.log_prob(sample)
         kl_batch = log_q - log_p
-        return torch.mean(kl_batch)
-
-
-class SparseMultivariateNormal(nn.Module):
-    def __init__(
-        self,
-        mean: float,
-        scale: float,  # scale (b) parameter for Laplace distribution
-        shape: int,
-    ):
-        super().__init__()
-        # Create distribution parameter tensors
-        means = torch.ones(shape) * mean
-        scales = torch.ones(shape) * scale
-        self.mean = nn.Parameter(means, requires_grad=False)
-        self.scale = nn.Parameter(scales, requires_grad=False)
-
-    def make_posterior(self, post_mean, post_std):
-        return Independent(Laplace(post_mean, post_std), 1)
-
-    def forward(self, post_mean, post_std):
-        # Create the posterior distribution
-        posterior = self.make_posterior(post_mean, post_std)
-        # Create the prior with Laplace distribution
-        prior = Independent(Laplace(0, self.scale), 1)
-        # Compute KL analytically
-        kl_batch = kl_divergence(posterior, prior)
-        return torch.mean(kl_batch)
-
-
-class SparseBernoulli(nn.Module):
-    def __init__(
-        self,
-        prob: float,
-        shape: int,
-    ):
-        super().__init__()
-        # Create distribution parameter tensors
-        probs = torch.ones(shape) * prob
-        self.probs = nn.Parameter(probs, requires_grad=True)
-
-    def make_posterior(self, post_probs, post_std):
-        return Independent(Bernoulli(post_probs), 1)
-
-    def forward(self, post_probs):
-        # Create the posterior distribution
-        posterior = self.make_posterior(post_probs, None)
-        # Create the prior with Bernoulli distribution
-        prior = Independent(Bernoulli(self.probs), 1)
-        # Compute KL analytically
-        kl_batch = kl_divergence(posterior, prior)
         return torch.mean(kl_batch)

@@ -1,4 +1,5 @@
 import io
+import math
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,20 +13,28 @@ from sklearn.decomposition import PCA
 
 def angle_diff(angle1, angle2):
     """
-    Calculate the smallest angle between two angles.
+    Calculate the smallest angle between two angles in radians,
+    handling the wrap around at theta = 0.
 
-    Args:
-    angle1 (float): The first angle in degrees.
-    angle2 (float): The second angle in degrees.
+    Parameters:
+    angle1 (float): First angle in radians.
+    angle2 (float): Second angle in radians.
 
     Returns:
-    float: The smallest angle between angle1 and angle2 in degrees.
+    float: The smallest angle between the two angles in radians.
     """
-    diff = (angle2 - angle1) % 2 * np.pi
-    if diff > np.pi:
-        diff -= 2 * np.pi
+    # Normalize angles to the range [0, 2*pi)
+    angle1 = angle1 % (2 * math.pi)
+    angle2 = angle2 % (2 * math.pi)
 
-    return abs(diff)
+    # Calculate the difference
+    diff = abs(angle1 - angle2)
+
+    # Ensure the difference is the smallest possible angle
+    if diff > math.pi:
+        diff = 2 * math.pi - diff
+
+    return diff
 
 
 def fig_to_rgb_array(fig):
@@ -61,18 +70,30 @@ class StateTransitionCallback(pl.Callback):
         if (trainer.current_epoch % self.log_every_n_epochs) != 0:
             return
         # Get trajectories and model predictions
-        data_dict = trainer.datamodule.all_data
-        ics = data_dict["ics"]
-        phase_dict = data_dict["phase_dict"]
-        task_names = data_dict["task_names"]
-        targets = data_dict["targets"]
-        inputs = data_dict["inputs"]
+
+        dataloader = trainer.datamodule.val_dataloader()
+        ics = torch.cat([batch[0] for batch in dataloader]).to(pl_module.device)
+        inputs = torch.cat([batch[1] for batch in dataloader]).to(pl_module.device)
+        targets = torch.cat([batch[2] for batch in dataloader]).to(pl_module.device)
+        inds = (
+            torch.cat([batch[3] for batch in dataloader])
+            .to(pl_module.device)
+            .detach()
+            .cpu()
+            .numpy()
+            .astype(int)
+        )
+        output_dict = pl_module.forward(ics, inputs)
+
+        extra_dict = trainer.datamodule.extra_data
+        phase_dict = [extra_dict["phase_dict"][ind] for ind in inds]
+        task_names = [extra_dict["task_names"][ind] for ind in inds]
 
         # Get the first indices for each task
-        included_tasks = trainer.datamodule.data_env.task_list_str
+        unique_tasks = np.unique(task_names)
 
         plot_dict = {}
-        for task1 in included_tasks:
+        for task1 in unique_tasks:
             task1_inds = [i for i, task in enumerate(task_names) if task == task1]
             plot_dict[task1] = task1_inds[0]
 
@@ -84,11 +105,11 @@ class StateTransitionCallback(pl.Callback):
         # Create plots for different cases
         fig, axes = plt.subplots(
             nrows=3,
-            ncols=len(included_tasks),
-            figsize=(6 * len(included_tasks), 6),
+            ncols=len(unique_tasks),
+            figsize=(6 * len(unique_tasks), 6),
             sharex=False,
         )
-
+        targets = targets.detach().cpu().numpy()
         input_labels = trainer.datamodule.input_labels
         output_labels = trainer.datamodule.output_labels
         for trial_count, trial_type in enumerate(plot_dict.keys()):
@@ -149,6 +170,115 @@ class StateTransitionCallback(pl.Callback):
         logger.log({"state_plot": wandb.Image(fig), "global_step": trainer.global_step})
 
 
+class SharedSubspaceCallback(pl.Callback):
+    def __init__(self, log_every_n_epochs=100, plot_n_trials=20):
+
+        self.log_every_n_epochs = log_every_n_epochs
+        self.plot_n_trials = plot_n_trials
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+
+        if (trainer.current_epoch % self.log_every_n_epochs) != 0:
+            return
+        dataloader = trainer.datamodule.val_dataloader()
+        ics = torch.cat([batch[0] for batch in dataloader]).to(pl_module.device)
+        inputs = torch.cat([batch[1] for batch in dataloader]).to(pl_module.device)
+        inds = (
+            torch.cat([batch[3] for batch in dataloader])
+            .to(pl_module.device)
+            .detach()
+            .cpu()
+            .numpy()
+            .astype(int)
+        )
+
+        extra_dict = trainer.datamodule.extra_data
+        phase_dict = [extra_dict["phase_dict"][ind] for ind in inds]
+        task_names = [extra_dict["task_names"][ind] for ind in inds]
+
+        # Get the first indices for each task
+        task1 = "MemoryPro"
+        task1_inds = [i for i, task in enumerate(task_names) if task == task1]
+        # make an int array
+        task1_inds = np.array(task1_inds).astype(int).squeeze()
+
+        task2 = "MemoryAnti"
+        task2_inds = [i for i, task in enumerate(task_names) if task == task2]
+        # make an int array
+        task2_inds = np.array(task2_inds).astype(int).squeeze()
+
+        loggers_all = trainer.loggers
+        logger = get_wandb_logger(loggers_all)
+
+        # Pass the data through the model
+        ics1 = ics[task1_inds]
+        inputs1 = inputs[task1_inds]
+        ics2 = ics[task2_inds]
+        inputs2 = inputs[task2_inds]
+
+        outputs1 = pl_module.forward(
+            torch.Tensor(ics1).to(pl_module.device),
+            torch.Tensor(inputs1).to(pl_module.device),
+        )["latents"]
+
+        outputs2 = pl_module.forward(
+            torch.Tensor(ics2).to(pl_module.device),
+            torch.Tensor(inputs2).to(pl_module.device),
+        )["latents"]
+
+        memInds1 = np.array([phase_dict[i]["mem1"] for i in task1_inds])
+        memInds2 = np.array([phase_dict[i]["mem1"] for i in task2_inds])
+
+        mem1_1 = []
+        mem1_2 = []
+        for i in range(len(memInds1)):
+            mem1_1.append(outputs1[i, memInds1[i, 0] : memInds1[i, 1], :])
+        for i in range(len(memInds2)):
+            mem1_2.append(outputs2[i, memInds2[i, 0] : memInds2[i, 1], :])
+
+        mem1_1 = torch.cat(mem1_1)
+        mem1_2 = torch.cat(mem1_2)
+
+        mem1_1 = mem1_1.detach().cpu().numpy()
+        mem1_2 = mem1_2.detach().cpu().numpy()
+
+        pca1 = PCA(n_components=3)
+        pca2 = PCA(n_components=3)
+        mem1_1_pca = pca1.fit_transform(mem1_1)
+        mem1_2_pca = pca2.fit_transform(mem1_2)
+        mem1_1_in_2 = pca2.transform(mem1_1)
+        mem1_2_in_1 = pca1.transform(mem1_2)
+
+        # Create plots for different cases
+        fig = plt.figure()
+        ax1 = fig.add_subplot(221, projection="3d")
+        ax2 = fig.add_subplot(222, projection="3d")
+        ax3 = fig.add_subplot(223, projection="3d")
+        ax4 = fig.add_subplot(224, projection="3d")
+
+        ax1.scatter(*mem1_1_pca.T)
+        ax4.scatter(*mem1_2_pca.T)
+        ax2.scatter(*mem1_1_in_2.T)
+        ax3.scatter(*mem1_2_in_1.T)
+
+        ax1.set_title("MemoryPro in MemoryPro")
+        ax2.set_title("MemoryPro in MemoryAnti")
+        ax3.set_title("MemoryAnti in MemoryPro")
+        ax4.set_title("MemoryAnti in MemoryAnti")
+
+        # Log the plot to tensorboard
+        im = fig_to_rgb_array(fig)
+        trainer.loggers[0].experiment.add_image(
+            "state_plot_scatter", im, trainer.global_step, dataformats="HWC"
+        )
+        logger.log(
+            {
+                "shared_memory_subspace": wandb.Image(fig),
+                "global_step": trainer.global_step,
+            }
+        )
+
+
 class StateTransitionScatterCallback(pl.Callback):
     def __init__(self, log_every_n_epochs=100, plot_n_trials=20):
 
@@ -160,18 +290,34 @@ class StateTransitionScatterCallback(pl.Callback):
         if (trainer.current_epoch % self.log_every_n_epochs) != 0:
             return
         # Get trajectories and model predictions
-        data_dict = trainer.datamodule.all_data
-        ics = data_dict["ics"]
-        phase_dict = data_dict["phase_dict"]
-        task_names = data_dict["task_names"]
-        targets = data_dict["targets"]
-        inputs = data_dict["inputs"]
+        dataloader = trainer.datamodule.val_dataloader()
+        ics = torch.cat([batch[0] for batch in dataloader]).to(pl_module.device)
+        inputs = torch.cat([batch[1] for batch in dataloader]).to(pl_module.device)
+        targets = (
+            torch.cat([batch[2] for batch in dataloader])
+            .to(pl_module.device)
+            .cpu()
+            .numpy()
+        )
+        inds = (
+            torch.cat([batch[3] for batch in dataloader])
+            .to(pl_module.device)
+            .cpu()
+            .numpy()
+            .astype(int)
+        )
+        output_dict = pl_module.forward(ics, inputs)
+
+        extra_dict = trainer.datamodule.extra_data
+        phase_dict = [extra_dict["phase_dict"][ind] for ind in inds]
+        task_names = [extra_dict["task_names"][ind] for ind in inds]
 
         # Get the first indices for each task
         included_tasks = trainer.datamodule.data_env.task_list_str
+        unique_tasks = np.unique(included_tasks)
 
         plot_dict = {}
-        for task1 in included_tasks:
+        for task1 in unique_tasks:
             task1_inds = [i for i, task in enumerate(task_names) if task == task1]
             plot_dict[task1] = task1_inds[0]
 
@@ -182,9 +328,9 @@ class StateTransitionScatterCallback(pl.Callback):
 
         # Create plots for different cases
         fig, axes = plt.subplots(
-            nrows=len(included_tasks),
+            nrows=len(unique_tasks),
             ncols=4,
-            figsize=(6, 2 * len(included_tasks)),
+            figsize=(6, 2 * len(unique_tasks)),
             sharex=False,
         )
 
@@ -227,12 +373,14 @@ class StateTransitionScatterCallback(pl.Callback):
                     inputs_trial[0, start_ind:end_ind, 2],
                     c=color_dict[phase],
                     label=phase,
+                    marker="o",
                 )
                 ax_inputs2.plot(
                     inputs_trial[0, start_ind:end_ind, 3],
                     inputs_trial[0, start_ind:end_ind, 4],
                     c=color_dict[phase],
                     label=phase,
+                    marker="o",
                 )
                 ax_outputs.plot(
                     controlled[0, start_ind:end_ind, 1],
@@ -311,20 +459,36 @@ class MultiTaskPerformanceCallback(pl.Callback):
         #
 
         # Get the data from the datamodule
-        data_dict = trainer.datamodule.all_data
-        ics = data_dict["ics"]
-        phase_dict = data_dict["phase_dict"]
-        task_names = data_dict["task_names"]
-        targets = data_dict["targets"]
-        inputs = data_dict["inputs"]
+        dataloader = trainer.datamodule.val_dataloader()
+        ics = torch.cat([batch[0] for batch in dataloader]).to(pl_module.device)
+        inputs = torch.cat([batch[1] for batch in dataloader]).to(pl_module.device)
+        targets = (
+            torch.cat([batch[2] for batch in dataloader])
+            .to(pl_module.device)
+            .detach()
+            .cpu()
+            .numpy()
+        )
+        inds = (
+            torch.cat([batch[3] for batch in dataloader])
+            .to(pl_module.device)
+            .detach()
+            .cpu()
+            .numpy()
+            .astype(int)
+        )
+        output_dict = pl_module.forward(ics, inputs)
+
+        extra_dict = trainer.datamodule.extra_data
+        phase_dict = [extra_dict["phase_dict"][ind] for ind in inds]
+        task_names = [extra_dict["task_names"][ind] for ind in inds]
 
         logger = get_wandb_logger(trainer.loggers)
         percent_success = np.zeros(len(trainer.datamodule.data_env.task_list_str))
 
+        unique_tasks = np.unique(task_names)
         # find indices where task_to_analyze is the task
-        for task_num, task_to_analyze in enumerate(
-            trainer.datamodule.data_env.task_list_str
-        ):
+        for task_num, task_to_analyze in enumerate(unique_tasks):
             task_inds = [
                 i for i, task in enumerate(task_names) if task == task_to_analyze
             ]
@@ -351,29 +515,25 @@ class MultiTaskPerformanceCallback(pl.Callback):
             # Iterate through task trials
             for i in range(len(task_phase_dict)):
                 response_edges = task_phase_dict[i]["response"]
-                response_len = response_edges[1] - response_edges[0]
 
-                # Compute average angle for the last 1/4 of the response period
+                # Compute angle for the last bin
                 response_val = tt_outputs[
                     i,
-                    response_edges[0] + (3 * response_len // 4) : response_edges[1],
+                    response_edges[1] - 1 : response_edges[1],
                     1:,
                 ]
                 mean_response = torch.mean(response_val, dim=0)
                 mean_angle = torch.atan2(mean_response[1], mean_response[0])
 
                 # Get the target angle
-                response_target = task_targets[
-                    i, response_edges[0] + response_len // 2 : response_edges[1], 1:
-                ]
-                mean_target = torch.mean(response_target, dim=0)
-                mean_target_angle = torch.atan2(mean_target[1], mean_target[0])
+                response_target = task_targets[i, response_edges[1] - 1, 1:]
+                mean_target_angle = torch.atan2(response_target[1], response_target[0])
 
                 # Compute the performance (angle difference)
                 perf[i] = angle_diff(mean_angle, mean_target_angle)
 
                 # if no response was correct, check if the response was close to 0
-                if torch.sum(np.abs(mean_target)) == 0:
+                if torch.sum(np.abs(response_target)) == 0:
                     no_respond_trial[i] = True
                     perf_dist[i] = torch.sum(mean_response)
 

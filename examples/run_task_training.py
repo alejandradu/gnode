@@ -18,9 +18,10 @@ from utils import make_data_tag, trial_function
 # Add custom resolver to create the data_tag so it can be used for run dir
 OmegaConf.register_new_resolver("make_data_tag", make_data_tag)
 log = logging.getLogger(__name__)
+dotenv.load_dotenv(override=True)
 
 # ---------------Options---------------
-LOCAL_MODE = False  # Set to True to run locally (for debugging)
+LOCAL_MODE = True  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
@@ -28,7 +29,7 @@ RUN_DESC = "NODE_12BFF_paper"  # For WandB and run dir
 TASK = "NBFF"  # Task to train on (see configs/task_env for options)
 MODEL = "NODE"  # Model to train (see configs/model for options)
 
-# -----------------Parameter Selection -----------------------------------
+# ----------------- Parameter Selection -----------------------------------
 SEARCH_SPACE = dict(
     # model = dict(
     #     latent_size = tune.grid_search([4]),
@@ -44,7 +45,16 @@ SEARCH_SPACE = dict(
         # Trainer Parameters -----------------------------------
         max_epochs=tune.choice([1000]),
     ),
+    model=dict(
+        latent_size=tune.grid_search([128]),
+    ),
     # Data Parameters -----------------------------------
+    datamodule_task=dict(
+        n_samples=tune.grid_search([1100]),
+    ),
+    datamodule_sim=dict(
+        n_samples=tune.grid_search([1100]),
+    ),
     params=dict(
         seed=tune.grid_search([0]),
         batch_size=tune.choice([100]),
@@ -64,8 +74,8 @@ SEARCH_SPACE = dict(
 
 # ------------------Data Management Variables --------------------------------
 
-dotenv.load_dotenv()
 HOME_DIR = Path(os.environ.get("HOME_DIR"))
+print(f"Saving files to {HOME_DIR}")
 
 path_dict = dict(
     tt_datasets=HOME_DIR / "content" / "datasets" / "tt",
