@@ -407,6 +407,13 @@ class MultiTask:
                     "response": [response_ind, total_len],
                 }
 
+#             a 100ms
+# fixation epoch with no inputs, a 350ms epoch with only contextual inputs, an 800ms stimulus epoch,
+# with both noisy stimuli and contextual inputs, a 100 ms delay epoch and a 20ms decision epoch
+# which is the only one where the target output z
+# ∗
+# (t) was defined
+
             case "Decision":
                 # Fixation
                 inputs[:response_ind, 0] = 1
