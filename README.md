@@ -56,7 +56,7 @@ conda create --name CtDEnv python=3.10
 conda activate CtDEnv
 cd ComputationThruDynamicsBenchmark
 pip install -e .
-pip install -U jax[cpu]
+pip install -U "jax[cpu]"
 
 ```
 You also need to install Dynamical Similarity Analysis (DSA).
