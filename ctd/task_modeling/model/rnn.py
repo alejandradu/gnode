@@ -185,7 +185,7 @@ class LintRNN(nn.Module):
         output_size=None,
         noise_level=0.05,
         gamma=0.2,
-        rank=None,
+        rank=128,
     ):
         super().__init__()
         self.input_size = input_size
@@ -200,11 +200,11 @@ class LintRNN(nn.Module):
     def init_model(self, input_size, output_size):
         self.input_size = input_size
         self.output_size = output_size
-        if self.rank is None:
-            self.recW = nn.Linear(self.latent_size, self.latent_size, bias=False)
-        else:
+        if self.rank != self.latent_size:
             self.recW2 = nn.Linear(self.latent_size, self.rank, bias=False)
             self.recW1 = nn.Linear(self.rank, self.latent_size, bias=False)
+        else:
+            self.recW = nn.Linear(self.latent_size, self.latent_size, bias=False)
         self.inpW = nn.Linear(self.input_size, self.latent_size, bias=False)
         self.bias = nn.Parameter(torch.zeros(self.latent_size))
         self.readout = nn.Linear(self.latent_size, output_size, bias=True)
@@ -212,10 +212,10 @@ class LintRNN(nn.Module):
     def forward(self, inputs, hidden):
         noise = torch.randn_like(hidden) * self.noise_level
         output = self.readout(hidden)
-        if self.rank is None:
-            hidden = (1 - self.gamma) * hidden + self.gamma * self.recW(self.act_func(hidden)) + self.inpW(inputs) + self.bias + noise
-        else:
+        if self.rank != self.latent_size:
             hidden = (1 - self.gamma) * hidden + self.gamma * self.recW1(self.recW2(self.act_func(hidden))) + self.inpW(inputs) + self.bias + noise
+        else:
+            hidden = (1 - self.gamma) * hidden + self.gamma * self.recW(self.act_func(hidden)) + self.inpW(inputs) + self.bias + noise
         
         return output, hidden
     
