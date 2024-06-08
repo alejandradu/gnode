@@ -220,10 +220,6 @@ class NeuralDataSimulator:
             h5file.create_dataset("readout", data=readout)
             h5file.create_dataset("orig_mean", data=orig_mean)
             h5file.create_dataset("orig_std", data=orig_std)
-<<<<<<< HEAD
-            #if self.use_neurons:
-            #    h5file.create_dataset("perm_neurons", data=perm_neurons)
-=======
 
             h5file.create_dataset("perm_neurons", data=perm_neurons)
 
@@ -413,4 +409,3 @@ class NeuralDataSimulatorGeneral:
 
             h5file.create_dataset("perm_neurons", data=perm_neurons)
         return data, inputs, activity, latents
->>>>>>> upstream/main

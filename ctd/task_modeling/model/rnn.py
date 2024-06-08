@@ -174,6 +174,52 @@ class NoisyGRU_LatentL2(nn.Module):
         return latent_l2_loss
 
 
+class LintRNN(nn.Module):
+    """Implement a vanilla RNN model following the equations used in 
+    Valente et al. 2022 and as introduced by Sapolinsky et al."
+    """
+    def __init__(
+        self,
+        latent_size,
+        input_size=None,
+        output_size=None,
+        noise_level=0.05,
+        gamma=0.2,
+        rank=None,
+    ):
+        super().__init__()
+        self.input_size = input_size
+        self.latent_size = latent_size
+        self.output_size = output_size
+        self.readout = None
+        self.noise_level = noise_level
+        self.gamma = gamma
+        self.act_func = nn.Tanh()
+        self.rank=rank
+
+    def init_model(self, input_size, output_size):
+        self.input_size = input_size
+        self.output_size = output_size
+        if self.rank is None:
+            self.recW = nn.Linear(self.latent_size, self.latent_size, bias=False)
+        else:
+            self.recW2 = nn.Linear(self.latent_size, self.rank, bias=False)
+            self.recW1 = nn.Linear(self.rank, self.latent_size, bias=False)
+        self.inpW = nn.Linear(self.input_size, self.latent_size, bias=False)
+        self.bias = nn.Parameter(torch.zeros(self.latent_size))
+        self.readout = nn.Linear(self.latent_size, output_size, bias=True)
+
+    def forward(self, inputs, hidden):
+        noise = torch.randn_like(hidden) * self.noise_level
+        output = self.readout(hidden)
+        if self.rank is None:
+            hidden = (1 - self.gamma) * hidden + self.gamma * self.recW(self.act_func(hidden)) + self.inpW(inputs) + self.bias + noise
+        else:
+            hidden = (1 - self.gamma) * hidden + self.gamma * self.recW1(self.recW2(self.act_func(hidden))) + self.inpW(inputs) + self.bias + noise
+        
+        return output, hidden
+    
+    
 class DriscollRNN(nn.Module):
     def __init__(
         self,

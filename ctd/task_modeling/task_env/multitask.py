@@ -9,7 +9,7 @@ from ctd.task_modeling.task_env.task_env import DecoupledEnvironment
 
 class MultiTaskWrapper(DecoupledEnvironment):
     """
-    An environment for the MultiTask dataset (Driscol et al. 2021).
+    An environment for the MultiTask dataset (Driscoll et al. 2021).
     15 tasks are available: Select which ones to include in the
     task_env config file.
 
@@ -406,13 +406,6 @@ class MultiTask:
                     "context": [0, response_ind],
                     "response": [response_ind, total_len],
                 }
-
-#             a 100ms
-# fixation epoch with no inputs, a 350ms epoch with only contextual inputs, an 800ms stimulus epoch,
-# with both noisy stimuli and contextual inputs, a 100 ms delay epoch and a 20ms decision epoch
-# which is the only one where the target output z
-# ∗
-# (t) was defined
 
             case "Decision":
                 # Fixation
