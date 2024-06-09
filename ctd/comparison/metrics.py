@@ -105,3 +105,38 @@ def get_latents_vaf(lats1, lats2, num_pcs=3):
         lats2_flat_pca, preds, multioutput="variance_weighted"
     )
     return var_exp
+
+
+def plot_loss_curves(directory, n_epochs, start_epochs=0):
+    """Plot the loss curves of all .csv files in a directory
+       Rename .csv files for key identifying params before plotting"""
+    
+    csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
+
+    for file in csv_files:
+        file = directory+file
+        # Load the data
+        with open(file, 'r') as f:
+            data = pd.read_csv(f)
+    
+        # Fill missing values with the previous ones
+        data.ffill(inplace=True)
+    
+        # Plot validation loss - 300 is max number of epochs shared by the 30+ tune sets
+        plt.figure(figsize=(10, 5))
+        plt.plot(data['epoch'][start_epochs:n_epochs], data['valid/loss'][start_epochs:n_epochs], label='Test Loss')
+    
+        # Plot test loss
+        plt.plot(data['epoch'][start_epochs:n_epochs], data['train/loss'][start_epochs:n_epochs], label='Train Loss')
+    
+        # Extract parameters from the filename
+        parameters = file.split(',')  # Change this if your delimiter is not an underscore
+        parameters[-1] = parameters[-1].replace('.csv', '')  # Remove the .csv extension from the last parameter
+        title = ' '.join(parameters)
+    
+        plt.title(f'{n_epochs} epochs for {title}')
+        plt.xlabel('Epoch', fontsize=16)
+        plt.ylabel('Loss', fontsize=16)
+        plt.legend()
+    
+        plt.show()
