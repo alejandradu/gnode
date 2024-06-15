@@ -2,6 +2,9 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import explained_variance_score, r2_score
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 # TODO Make metrics agnostic to the analysis class
@@ -107,12 +110,12 @@ def get_latents_vaf(lats1, lats2, num_pcs=3):
     return var_exp
 
 
-def plot_loss_curves(directory, n_epochs, start_epochs=0):
-    """Plot the loss curves of all .csv files in a directory
-       Rename .csv files for key identifying params before plotting"""
+def plot_valid_train(directory, n_epochs, start_epochs=0, access_df=False, steps_per_epoch=12):
     
     csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
 
+
+    i=0
     for file in csv_files:
         file = directory+file
         # Load the data
@@ -122,21 +125,30 @@ def plot_loss_curves(directory, n_epochs, start_epochs=0):
         # Fill missing values with the previous ones
         data.ffill(inplace=True)
     
+        # list of indexes to get the x data from
+        epochs = np.array(np.linspace(0, n_epochs[i], n_epochs[i]-1), dtype=int)
+        # timepoints to sample
+        s = epochs*steps_per_epoch
+        
+        plt.figure(figsize=(10, 5), dpi=300)
         # Plot validation loss - 300 is max number of epochs shared by the 30+ tune sets
-        plt.figure(figsize=(10, 5))
-        plt.plot(data['epoch'][start_epochs:n_epochs], data['valid/loss'][start_epochs:n_epochs], label='Test Loss')
+        plt.plot(data['epoch'][s], data['valid/loss'][s], label='Validation Loss')
     
         # Plot test loss
-        plt.plot(data['epoch'][start_epochs:n_epochs], data['train/loss'][start_epochs:n_epochs], label='Train Loss')
+        plt.plot(data['epoch'][s], data['train/loss'][s], label='Train Loss')
     
         # Extract parameters from the filename
         parameters = file.split(',')  # Change this if your delimiter is not an underscore
         parameters[-1] = parameters[-1].replace('.csv', '')  # Remove the .csv extension from the last parameter
         title = ' '.join(parameters)
     
-        plt.title(f'{n_epochs} epochs for {title}')
-        plt.xlabel('Epoch', fontsize=16)
-        plt.ylabel('Loss', fontsize=16)
+        plt.title(f'Validation and Test Loss Over Epochs for {file}')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        i = i + 1
         plt.legend()
+        
+    plt.show()
     
-        plt.show()
+    if access_df:
+        return data

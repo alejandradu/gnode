@@ -31,25 +31,25 @@ MODEL = "LintRNN"  # Model to train (see configs/model for options)
 # -----------------Parameter Selection ---------------------------------
 SEARCH_SPACE = dict(
     model = dict(
-        latent_size = tune.grid_search([128]),
+        latent_size = tune.grid_search([128, 512]),
         noise_level = tune.grid_search([0]),
         # rank = tune.grid_search([2]),  only fits if rank != latent_size
         # noise level=0.05, gamma=1 (dt = tau)
     ),
     task_wrapper=dict(
         # Task Wrapper Parameters - high learning rate, low weight decay
-        weight_decay=tune.grid_search([1e-8, 1e-5]),
-        learning_rate=tune.grid_search([1e-2, 1e-4]),
+        weight_decay=tune.grid_search([1e-8]), # does not make much difference
+        learning_rate=tune.grid_search([1e-4, 1e-2]),
     ),
     trainer=dict(
         # Trainer Parameters 
         max_epochs=tune.choice([300]),
-        log_every_n_steps=tune.choice([1]),
+        log_every_n_steps=tune.choice([1]),   # rather logs every epoch
     ),
     # Data Parameters 
     params=dict(
         seed=tune.grid_search([0]),
-        batch_size=tune.choice([128]),
+        batch_size=tune.choice([256, 64]),
         num_workers=tune.choice([1]),
         n_samples=tune.choice([500]),  
     ),
@@ -121,7 +121,7 @@ def main(
         metric="loss",
         mode="min", 
         config=SEARCH_SPACE,
-        resources_per_trial=dict(cpu=4, gpu=1), 
+        resources_per_trial=dict(cpu=1, gpu=1), 
         num_samples=1,                      # HERE: number of times to sample from hyperparam space
         storage_path=str(RUN_DIR),
         search_alg=BasicVariantGenerator(),

@@ -118,11 +118,11 @@ def train(
     )
     datamodule.set_environment(data_env=task_env)
 
-    # -----Step 5:----------------Instantiate simulator---------------------------
-    log.info("Instantiating neural data simulator")
-    simulator: NeuralDataSimulator = hydra.utils.instantiate(
-        config_all["simulator"], _convert_="all"
-    )
+    # # -----Step 5:----------------Instantiate simulator---------------------------
+    # log.info("Instantiating neural data simulator")
+    # simulator: NeuralDataSimulator = hydra.utils.instantiate(
+    #     config_all["simulator"], _convert_="all"
+    # )
 
     # -----Step 6:-----------------Instantiate callbacks---------------------------
     callbacks: List[pl.Callback] = []
@@ -182,34 +182,34 @@ def train(
     with open(path2, "wb") as f:
         pickle.dump(datamodule, f)
 
-    # ------Step 11:------------Instantiate sim datamodule---------------------------
-    log.info("Instantiating datamodule for neural simulation")
-    sim_datamodule: pl.LightningDataModule = hydra.utils.instantiate(
-        config_all["datamodule_sim"], _convert_="all"
-    )
-    sim_datamodule.set_environment(
-        data_env=sim_env,
-        for_sim=True,
-    )
-    sim_datamodule.prepare_data()
-    sim_datamodule.setup()
+    # # ------Step 11:------------Instantiate sim datamodule---------------------------
+    # log.info("Instantiating datamodule for neural simulation")
+    # sim_datamodule: pl.LightningDataModule = hydra.utils.instantiate(
+    #     config_all["datamodule_sim"], _convert_="all"
+    # )
+    # sim_datamodule.set_environment(
+    #     data_env=sim_env,
+    #     for_sim=True,
+    # )
+    # sim_datamodule.prepare_data()
+    # sim_datamodule.setup()
 
-    task_wrapper.set_environment(sim_env)
-    # ------Step 12:------------Simulate neural data---------------------------
-    simulator.simulate_neural_data(
-        task_trained_model=task_wrapper,
-        datamodule=sim_datamodule,
-        run_tag=run_tag,
-        dataset_path=path_dict["dt_datasets"],
-        subfolder=subfolder,
-        seed=0,
-    )
+    # task_wrapper.set_environment(sim_env)
+    # # ------Step 12:------------Simulate neural data---------------------------
+    # simulator.simulate_neural_data(
+    #     task_trained_model=task_wrapper,
+    #     datamodule=sim_datamodule,
+    #     run_tag=run_tag,
+    #     dataset_path=path_dict["dt_datasets"],
+    #     subfolder=subfolder,
+    #     seed=0,
+    # )
 
-    # ------Step 13:--------Save simulator and sim datamodule------------
-    path3 = os.path.join(SAVE_PATH, run_tag, subfolder, "simulator.pkl")
-    with open(path3, "wb") as f:
-        pickle.dump(simulator, f)
+    # # ------Step 13:--------Save simulator and sim datamodule------------
+    # path3 = os.path.join(SAVE_PATH, run_tag, subfolder, "simulator.pkl")
+    # with open(path3, "wb") as f:
+    #     pickle.dump(simulator, f)
 
-    path3 = os.path.join(SAVE_PATH, run_tag, subfolder, "datamodule_sim.pkl")
-    with open(path3, "wb") as f:
-        pickle.dump(sim_datamodule, f)
+    # path3 = os.path.join(SAVE_PATH, run_tag, subfolder, "datamodule_sim.pkl")
+    # with open(path3, "wb") as f:
+    #     pickle.dump(sim_datamodule, f)

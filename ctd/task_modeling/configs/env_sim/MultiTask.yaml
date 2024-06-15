@@ -2,10 +2,10 @@ _target_: ctd.task_modeling.task_env.multitask.MultiTaskWrapper
 dataset_name: MultiTask
 task_list:
   - DelayPro
-  - DelayAnti
   - MemoryPro
-  - MemoryAnti
   - ReactPro
+  - DelayAnti
+  - MemoryAnti
   - ReactAnti
   - IntMod1
   - IntMod2
@@ -17,10 +17,10 @@ task_list:
   - MatchCatPro
   - MatchCatAnti
 
-n_timesteps: 1200
-noise: 0.1
+n_timesteps: 500
+noise: 0.05
 dynamic_noise: 0.0
 num_targets: 32
 bin_size: 20
-grouped_sampler: False
-latent_l2_wt: 0.0
+grouped_sampler: True
+latent_l2_wt: 1e-6

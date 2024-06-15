@@ -17,10 +17,10 @@ task_list:
   - MatchCatPro
   - MatchCatAnti
 
-n_timesteps: 1200
-noise: 0.1
+n_timesteps: 500
+noise: 0.05
 dynamic_noise: 0.0
 num_targets: 32
 bin_size: 20
 grouped_sampler: True
-latent_l2_wt: 0.0
+latent_l2_wt: 1e-6

@@ -26,12 +26,12 @@ WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
 RUN_DESC = "node_CDM"  # For WandB and run dir
 TASK = "MultiTask"  # Task to train on (see configs/task_env for options)
-MODEL = "LintRNN"  # Model to train (see configs/model for options)
+MODEL = "NODE"  # Model to train (see configs/model for options)
 
 # -----------------Parameter Selection ---------------------------------
 SEARCH_SPACE = dict(
     model = dict(
-        latent_size = tune.grid_search([2,3]),
+        latent_size = tune.grid_search([2,3,10]),
         # noise_level = tune.grid_search([0]),
         # rank = tune.grid_search([2]),  only fits if rank != latent_size
         # noise level=0.05, gamma=1 (dt = tau)
@@ -39,17 +39,17 @@ SEARCH_SPACE = dict(
     task_wrapper=dict(
         # Task Wrapper Parameters - high learning rate, low weight decay
         weight_decay=tune.grid_search([1e-9]),
-        learning_rate=tune.grid_search([1e-2, 1e-4]),
+        learning_rate=tune.grid_search([1e-2]),
     ),
     trainer=dict(
         # Trainer Parameters 
-        max_epochs=tune.choice([300]),
+        max_epochs=tune.choice([500]),
         log_every_n_steps=tune.choice([1]),
     ),
     # Data Parameters 
     params=dict(
         seed=tune.grid_search([0]),
-        batch_size=tune.choice([128]),
+        batch_size=tune.choice([128,64,256]),
         num_workers=tune.choice([1]),
         n_samples=tune.choice([500]),  
     ),
