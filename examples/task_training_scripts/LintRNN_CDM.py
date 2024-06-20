@@ -26,32 +26,33 @@ WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
 RUN_DESC = "LintRNN_CDM"  # For WandB and run dir
 TASK = "MultiTask"  # Task to train on (see configs/task_env for options)
-MODEL = "LintRNN"  # Model to train (see configs/model for options)
+MODEL = "DriscollRNN"  # Model to train (see configs/model for options)
 
 # -----------------Parameter Selection ---------------------------------
 SEARCH_SPACE = dict(
     model = dict(
-        latent_size = tune.grid_search([128, 512]),
+        latent_size = tune.grid_search([512]),
         noise_level = tune.grid_search([0]),
+        #l2_wt = tune.grid_search([1e-6, 1e-8]),
         # rank = tune.grid_search([2]),  only fits if rank != latent_size
         # noise level=0.05, gamma=1 (dt = tau)
     ),
     task_wrapper=dict(
         # Task Wrapper Parameters - high learning rate, low weight decay
         weight_decay=tune.grid_search([1e-8]), # does not make much difference
-        learning_rate=tune.grid_search([1e-4, 1e-2]),
+        learning_rate=tune.grid_search([1e-2]),
     ),
     trainer=dict(
         # Trainer Parameters 
-        max_epochs=tune.choice([300]),
+        max_epochs=tune.choice([10]),
         log_every_n_steps=tune.choice([1]),   # rather logs every epoch
     ),
     # Data Parameters 
     params=dict(
         seed=tune.grid_search([0]),
-        batch_size=tune.choice([256, 64]),
+        batch_size=tune.choice([24]),
         num_workers=tune.choice([1]),
-        n_samples=tune.choice([500]),  
+        n_samples=tune.choice([1000]),  # number of trials to simulate
     ),
     # task parameters
     env_task=dict(

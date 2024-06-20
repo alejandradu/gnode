@@ -31,7 +31,7 @@ MODEL = "NODE"  # Model to train (see configs/model for options)
 # -----------------Parameter Selection ---------------------------------
 SEARCH_SPACE = dict(
     model = dict(
-        latent_size = tune.grid_search([2,3,10]),
+        latent_size = tune.grid_search([10]),
         # noise_level = tune.grid_search([0]),
         # rank = tune.grid_search([2]),  only fits if rank != latent_size
         # noise level=0.05, gamma=1 (dt = tau)
@@ -43,7 +43,7 @@ SEARCH_SPACE = dict(
     ),
     trainer=dict(
         # Trainer Parameters 
-        max_epochs=tune.choice([500]),
+        max_epochs=tune.choice([5]),
         log_every_n_steps=tune.choice([1]),
     ),
     # Data Parameters 

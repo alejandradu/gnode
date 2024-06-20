@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 from torch.nn import GRUCell, RNNCell
+import numpy as np
+import torch.nn.init as init
 
 """
 All models must meet a few requirements
@@ -176,7 +178,8 @@ class NoisyGRU_LatentL2(nn.Module):
 
 class LintRNN(nn.Module):
     """Implement a vanilla RNN model following the equations used in 
-    Valente et al. 2022 and as introduced by Sapolinsky et al."
+    Valente et al. 2022 and as introduced by Sapolinsky et al.
+    Only trains the scaling of input and output matrices for now"
     """
     def __init__(
         self,
@@ -186,45 +189,84 @@ class LintRNN(nn.Module):
         noise_level=0.05,
         gamma=0.2,
         rank=128,
+        low_rank=False,
+        rho=0.1,  # mean of recW init. 0.1 for CDM, 1 for the rest
+        output_non_linearity=None,
+        l2_wt = 1e-6,
     ):
         super().__init__()
         self.input_size = input_size
         self.latent_size = latent_size
         self.output_size = output_size
-        self.readout = None
         self.noise_level = noise_level
         self.gamma = gamma
         self.act_func = nn.Tanh()
+        self.output_non_linearity = output_non_linearity if output_non_linearity is not None else nn.Tanh()
         self.rank=rank
         self.cell = None
+        self.rho=rho
+        self.low_rank=low_rank
+        self.l2_wt = l2_wt
 
     def init_model(self, input_size, output_size):
         self.input_size = input_size
         self.output_size = output_size
-        if self.rank != self.latent_size:
-            #self.recW2 = nn.Linear(self.latent_size, self.rank, bias=False)
-            #self.recW1 = nn.Linear(self.rank, self.latent_size, bias=False)
-            self.recW2 = nn.Parameter(torch.randn(self.latent_size, self.rank))
-            self.recW1 = nn.Parameter(torch.randn(self.rank, self.latent_size))
+        if self.low_rank:
+            self.recW1 = nn.Linear(self.latent_size, self.rank, bias=False)
+            self.recW2 = nn.Linear(self.rank, self.latent_size, bias=False)
         else:
-            #self.recW = nn.Linear(self.latent_size, self.latent_size, bias=False)
-            self.recW = nn.Parameter(torch.randn(self.latent_size, self.latent_size))
-        #self.inpW = nn.Linear(self.input_size, self.latent_size, bias=False)
-        self.inpW = nn.Parameter(torch.randn(self.input_size, self.latent_size))
+            self.recW = nn.Linear(self.latent_size, self.latent_size, bias=False)
+        # input has a trainable scaling composed linear transformation
+        self.scaleI = nn.Linear(self.input_size, self.input_size, bias=False)
+        self.inpW = nn.Linear(self.input_size, self.latent_size, bias=False)
+        # output also has trainable scaling layer
+        self.scaleO = nn.Linear(self.output_size, self.output_size, bias=False)
+        self.outW = nn.Linear(self.latent_size, self.output_size, bias=False)
+        # general bias
         self.bias = nn.Parameter(torch.zeros(self.latent_size))
-        self.readout = nn.Linear(self.latent_size, output_size, bias=True)
-        # create a Torch class 
-
+        
+        self.init_layers()
+        
+        # access to the FP finder
+        self.cell = self.clone_cell()
+        
+    def init_layers(self):
+        # initialize to gaussians
+        init.normal_(self.inpW.weight)
+        init.normal_(self.outW.weight, std=1 / self.latent_size)
+        if self.low_rank:
+            init.normal_(self.recW1.weight)
+            init.normal_(self.recW2.weight)
+        else:
+            init.normal_(self.recW.weight, std = self.rho / np.sqrt(self.latent_size))
+            
+        # initialize to ones
+        init.constant_(self.scaleI.weight, 1)
+        init.constant_(self.scaleO.weight, 1)
+        
+    # correcting bc LINT adds an extra nonlinearity in the output layer
+    def readout(self, hidden):
+        if self.output_non_linearity is not None:
+            return self.scaleO(self.outW(self.output_non_linearity(hidden)))
+        else:
+            return self.scaleO(self.outW(hidden))
+        
     def forward(self, inputs, hidden):
         noise = torch.randn_like(hidden) * self.noise_level
         output = self.readout(hidden)
-        if self.rank != self.latent_size:
-            hidden = (1 - self.gamma) * hidden + self.gamma * self.recW1.matmul(self.recW2.matmul(self.act_func(hidden))) + self.inpW.matmul(inputs) + self.bias + noise
+        if self.low_rank:
+            hidden = (1 - self.gamma) * hidden + self.gamma * self.recW2(self.recW1(self.act_func(hidden))) + self.inpW(self.scaleI(inputs)) + self.bias + noise
         else:
-            hidden = (1 - self.gamma) * hidden + self.gamma * self.act_func(hidden).matmul(self.recW) + inputs.matmul(self.inpW) + self.bias + noise
+            hidden = (1 - self.gamma) * hidden + self.gamma * self.recW(self.act_func(hidden)) + self.inpW(self.scaleI(inputs)) + self.bias + noise
             # inputs/hidden/etc torch objects come as rows = batch size, columns = parameter size
         
         return output, hidden
+    
+    def model_loss(self, loss_dict):
+        latents = loss_dict["latents"]
+        lats_flat = latents.view(latents.shape[0], -1)
+        latent_l2_loss = self.l2_wt * torch.norm(lats_flat, p=2, dim=1).mean()
+        return latent_l2_loss
     
     def clone_cell(self):
         new_net = LintRNN(self.latent_size, self.input_size, self.output_size, self.noise_level, self.gamma,
@@ -354,7 +396,7 @@ class FullRankRNN(nn.Module):
             self.si.requires_grad = False
         else:
             self.wi.requires_grad = False
-        if not train_si:
+        if not train_si:   # s stands for scale!!
             self.si.requires_grad = False
         self.wrec = nn.Parameter(torch.Tensor(latent_size, latent_size))
         if not train_wrec:
@@ -400,7 +442,7 @@ class FullRankRNN(nn.Module):
                 self.so.set_(torch.ones_like(self.so))
             else:
                 self.so.copy_(so_init)
-            self.h0.zero_()
+            self.h0.zero_()  # note the initial hiddens are zero
         self.wi_full, self.wo_full = [None] * 2
         self._define_proxy_parameters()
 

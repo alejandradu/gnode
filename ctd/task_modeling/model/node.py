@@ -6,9 +6,9 @@ from torch import nn
 class NODE(nn.Module):
     def __init__(
         self,
-        num_layers,
-        layer_hidden_size,
-        latent_size,
+        num_layers,  # the length of MLP
+        layer_hidden_size,  # the rank inside MLP 
+        latent_size,  # dimension of h
         output_size=None,
         input_size=None,
     ):
@@ -118,12 +118,24 @@ class gNODE(nn.Module):
         nn.init.constant_(self.readout.bias, 0.0)  # Zero bias initialization
 
     def forward(self, inputs, hidden=None):
-        n_samples, n_inputs = inputs.shape
-        dev = inputs.device
-        if hidden is None:
-            hidden = torch.zeros((n_samples, self.latent_size), device=dev)
-        hidden = self.generator(inputs, hidden)
-        gate = torch.sigmoid(self.gate(hidden))
-        hidden = hidden * gate
-        output = self.readout(hidden)
-        return output, hidden
+            """
+            Forward pass of the node model.
+
+            Args:
+                inputs (torch.Tensor): Input tensor of shape (n_samples, n_inputs).
+                hidden (torch.Tensor, optional): Hidden state tensor of shape (n_samples, latent_size).
+                    Defaults to None.
+
+            Returns:
+                output (torch.Tensor): Output tensor of shape (n_samples, output_size).
+                hidden (torch.Tensor): Updated hidden state tensor of shape (n_samples, latent_size).
+            """
+            n_samples, n_inputs = inputs.shape
+            dev = inputs.device
+            if hidden is None:
+                hidden = torch.zeros((n_samples, self.latent_size), device=dev)
+            hidden = self.generator(inputs, hidden)
+            gate = torch.sigmoid(self.gate(hidden))
+            hidden = hidden * gate
+            output = self.readout(hidden)
+            return output, hidden

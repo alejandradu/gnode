@@ -163,9 +163,14 @@ def train(
         _convert_="all",
     )
 
-    # -------Step 9:-----------------Train model---------------------------
+    # -------Step 9.1:-----------------Train model---------------------------
     log.info("Training model")
     trainer.fit(model=task_wrapper, datamodule=datamodule)
+    
+    
+    # ------Step 9.2:---------- Test model ---------------------------
+    trainer.test(model=task_wrapper, datamodule=datamodule)
+    
 
     # -------Step 10:----------Save model and datamodule---------------------------
     log.info("Saving model and datamodule")
