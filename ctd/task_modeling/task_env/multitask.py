@@ -5,6 +5,7 @@ from gymnasium import spaces
 from ctd.task_modeling.datamodule.samplers import GroupedSampler, RandomSampler
 from ctd.task_modeling.task_env.loss_func import MultiTaskLoss
 from ctd.task_modeling.task_env.task_env import DecoupledEnvironment
+from matplotlib.lines import Line2D
 
 
 class MultiTaskWrapper(DecoupledEnvironment):
@@ -611,7 +612,7 @@ class MultiTask:
 
     def plot_trial(self):
         inputs, outputs, phase_dict, task_name, true_inputs = self.generate_trial()
-        fig = plt.figure(figsize=(5, 10))
+        fig = plt.figure(figsize=(10, 10))
 
         ax1 = fig.add_subplot(7, 1, 1)
         for phase in phase_dict:
@@ -622,7 +623,7 @@ class MultiTask:
                 + (phase_dict[phase][1] - phase_dict[phase][0]) / 2,
                 0.5,
                 phase,
-                fontsize=12,
+                fontsize=8,
                 horizontalalignment="center",
                 verticalalignment="top",
             )
@@ -694,7 +695,7 @@ class MultiTask:
         ax_input1 = fig1.add_subplot(1, 4, 1)
         ax_input2 = fig1.add_subplot(1, 4, 2)
         ax_output = fig1.add_subplot(1, 4, 3)
-        ax_labels = fig1.add_subplot(1, 4, 4)
+        ax_legend = plt.subplot(1, 4, 4)
 
         color_dict = {
             "context": "k",
@@ -722,8 +723,15 @@ class MultiTask:
                 outputs[phase_dict[phase1][0] : phase_dict[phase1][1], 2],
                 c=color_dict[phase1],
             )
-            ax_labels.scatter([0, 0], [0, 0], c=color_dict[phase1], label=phase1)
-        ax_labels.legend()
+            
+        # Create a list of Line2D objects for the legend
+        legend_elements = [Line2D([0], [0], color=color, lw=4, label=phase) for phase, color in color_dict.items()]
+
+        # Add the legend to your plot
+        ax_legend.axis('off')
+        # Add the legend to the new subplot
+        ax_legend.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(0.5, 0.5))
+
 
         ax_input1.set_title("Input 1")
         ax_input2.set_title("Input 2")
@@ -744,13 +752,10 @@ class MultiTask:
         ax_input2.set_yticklabels([])
         ax_output.set_xticklabels([])
         ax_output.set_yticklabels([])
-        ax_labels.set_xticklabels([])
-        ax_labels.set_yticklabels([])
 
         ax_input1.set_aspect("equal", adjustable="box")
         ax_input2.set_aspect("equal", adjustable="box")
         ax_output.set_aspect("equal", adjustable="box")
-        ax_labels.set_aspect("equal", adjustable="box")
 
         plt.tight_layout()
         plt.suptitle(f"Trial: {self.task_name}")

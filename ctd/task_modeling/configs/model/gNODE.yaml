@@ -1,0 +1,9 @@
+_target_: ctd.task_modeling.model.gnode.gNODE
+dynamics_n_layers: 100
+gating_n_layers: 10
+dynamics_hidden_size: 3
+gating_hidden_size: 3
+latent_size: 3      
+gating_linear: False  
+dt: 1
+euler_step_size: 0.1

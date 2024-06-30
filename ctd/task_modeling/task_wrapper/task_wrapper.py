@@ -2,6 +2,7 @@ import pytorch_lightning as pl
 import torch
 from gymnasium import Env
 from torch import nn
+from line_profiler import profile
 
 
 class TaskTrainedWrapper(pl.LightningModule):
@@ -97,6 +98,7 @@ class TaskTrainedWrapper(pl.LightningModule):
         joint_state = info["states"]["joint"]
         return action, rnn_hidden, env_states, joint_state
 
+    #profile
     def forward(self, ics, inputs, inputs_to_env=None):
         """Pass data through the model
         args:
@@ -196,6 +198,7 @@ class TaskTrainedWrapper(pl.LightningModule):
         }
         return output_dict
 
+    #profile
     def training_step(self, batch, batch_ix):
         # Get the batch data
         ics = batch[0]
@@ -228,6 +231,7 @@ class TaskTrainedWrapper(pl.LightningModule):
         self.log("train/loss", loss_all)
         return loss_all
 
+    #profile
     def validation_step(self, batch, batch_ix):
         ics = batch[0]
         inputs = batch[1]

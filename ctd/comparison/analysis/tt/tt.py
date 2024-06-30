@@ -19,6 +19,9 @@ dotenv.load_dotenv(override=True)
 HOME_DIR = os.getenv("HOME_DIR")
 
 
+# TODO: big description of this class and its methods
+
+
 class Analysis_TT(Analysis):
     def __init__(self, run_name, filepath, use_train_dm=False):
         # initialize superclass
@@ -37,11 +40,15 @@ class Analysis_TT(Analysis):
         # so I am calculating the field for something with set inputs and targets
         self.model = self.wrapper.model
         if use_train_dm:
-            with open(filepath + "datamodule_train.pkl", "rb") as f:
-                self.datamodule = torch.load(f, map_location=torch.device('cpu'))
-                #self.datamodule = pickle.load(f)
-                self.datamodule.prepare_data()
-                self.datamodule.setup()
+            # with open(filepath + "datamodule_train.pkl", "rb") as f:
+            #     self.datamodule = torch.load(f, map_location=torch.device('cpu'))
+            #     #self.datamodule = pickle.load(f)
+            #     self.datamodule.prepare_data()
+            #     self.datamodule.setup()
+            f = filepath + "datamodule_train.pkl"
+            self.datamodule = torch.load(f, map_location=torch.device('cpu'))
+            self.datamodule.prepare_data()
+            self.datamodule.setup()
         else:
             with open(filepath + "datamodule_sim.pkl", "rb") as f:
                 self.datamodule = pickle.load(f)
@@ -642,50 +649,8 @@ class Analysis_TT(Analysis):
             ax.set_zlabel("$m_3$", fontsize=25)
             ax.set_zlim(latents_range[2])
         plt.show()
-        
-
-    def animate_trajectory(self, i, latents_range, num_points, input_field, filename='trajectory_animation.mp4'):
-        """
-        Visualize the trajectory of one trial in the latent space
-        overlayed on the flow field.
-
-        Args:
-            i (int): index of the trajectory to visualize (< num_trials)
-            in training
-            latents_range (list): list with each component the 
-            coordinate limits for the grid defining the latent space to plot 
-            the flow field.
-            num_points (int): number of points along each dimension to get
-            the grid.
-            input_field (torch.tensor): input to calculate F at every point 
-            in the grid (the field). 
-            filename (str, optional): Defaults to 'trajectory_animation.mp4'.
-        """
-        # Get the i'th latent trajectory
-        latents = self.get_latents().detach().numpy()
-        trajectory = latents[i]
-
-        # Create a figure and axes
-        fig, ax = self.plot_velocity_field_non_pca([self], input_field, latents_range, num_points)
-
-        # Create a scatter plot for the trajectory point
-        S = ax.scatter(*trajectory[0], color='red')
-
-        # Animation update function
-        def update(num):
-            # Update the trajectory point
-            S.set_offsets(trajectory[num])
-
-            # Return the updated artists
-            return S,
-
-        # Create the animation
-        ani = animation.FuncAnimation(fig, update, frames=len(trajectory), interval=200, blit=True)
-
-        # Save the animation as a video file
-        ani.save(filename, writer='ffmpeg')
-
-        plt.close(fig)
+    
+    # TODO: maybe add a trajectory animation method
     
     # get trajectories where input is always value
     def get_custom_input_latents(self, value):
@@ -784,10 +749,13 @@ class Analysis_TT(Analysis):
         ax2.set_yticks([50, 90, 95, 99])
         plt.savefig(f"{HOME_DIR}/scree_plot.png")
         return pca.explained_variance_ratio_
-
-    def explore_params(self):
-        _, inputs, _ = self.get_model_inputs_noiseless()
-        print("shape of the inputs to model F: ", inputs.shape)
-        latents = self.get_latents_noiseless()
-        print("shape of the latents: ", latents.shape)
     
+    def get_param(self, param, detach=True):
+        """Get a specific parameter of the model after training"""
+        if detach:
+            return self.model.state_dict()[param].detach().numpy()
+        else:
+            return self.model.state_dict()[param]
+        
+    #def get_J_matrix(self):
+        # wrt fitting neural data (and there is a firing rate lambda(t))
