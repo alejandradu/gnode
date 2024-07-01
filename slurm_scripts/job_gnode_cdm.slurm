@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=gnode_profiling       # create a short name for your job
+#SBATCH --job-name=gnode_test_della       # create a short name for your job
 #SBATCH --nodes=1                # node count
 #SBATCH --ntasks=1               # total number of tasks across all nodes
 #SBATCH --cpus-per-task=1        # cpu-cores per task (>1 if multi-threaded tasks)
@@ -14,4 +14,4 @@ module load anaconda3/2024.2
 module load cudatoolkit/12.4
 conda activate gnode
 
-kernprof -l examples/task_training_scripts/gnode_CDM.py
+python examples/task_training_scripts/gnode_CDM.py
