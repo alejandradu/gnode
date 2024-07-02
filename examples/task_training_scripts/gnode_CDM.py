@@ -45,7 +45,7 @@ SEARCH_SPACE = dict(
     ),
     task_wrapper=dict(
         # Task Wrapper Parameters - high learning rate, low weight decay
-        weight_decay=tune.grid_search([1e-9]),
+        weight_decay=tune.grid_search([1e-9, 1e-2]),
         learning_rate=tune.grid_search([5e-2]),
     ),
     trainer=dict(
@@ -57,7 +57,7 @@ SEARCH_SPACE = dict(
     params=dict(
         seed=tune.grid_search([0]),
         batch_size=tune.choice([32, 64]),  
-        num_workers=tune.choice([1, 10]),   # TODO: so these are just for dataloading, not the workers=nodes Ray uses?
+        #num_workers=tune.choice([1, 10]),   # TODO: so these are just for dataloading, not the workers=nodes Ray uses?
         n_samples=tune.choice([256]),      # TODO: this has to be much more
     ),
     # task parameters
@@ -111,37 +111,33 @@ if not WANDB_LOGGING:
 
 # ------------- Settings for parallel training -------------------------
 
-scaling_config = ScalingConfig(    
-    num_workers=4,  # number of distributed workers - should match total trials?
-    use_gpu=True,    # whether each worker should use a gpu
-    resources_per_worker={"CPU": 1, "GPU": 1},   # default, but consider cluster architecture to change
-    placement_strategy="SPREAD",   # PACK favors memory (locality) and SPREAD favors speed
-)
+# scaling_config = ScalingConfig(    
+#     num_workers=4,  # number of distributed workers - should match total trials?
+#     use_gpu=True,    # whether each worker should use a gpu
+#     resources_per_worker={"CPU": 1, "GPU": 1},   # default, but consider cluster architecture to change
+#     placement_strategy="SPREAD",   # PACK favors memory (locality) and SPREAD favors speed
+# )
 
-run_config = RunConfig(           
-    # checkpoint_config=CheckpointConfig(
-    #     num_to_keep=3,   # TODO: what is this??
-    #     checkpoint_score_attribute="loss",
-    #     checkpoint_score_order="max",
-    # ),
-    storage_path=str(RUN_DIR),
-    verbose=1,
-    progress_reporter=CLIReporter(
-            metric_columns=["loss", "training_iteration"],
-            sort_by_metric=True,
-        ),
-)
+# run_config = RunConfig(           
+#     # checkpoint_config=CheckpointConfig(
+#     #     num_to_keep=3,  
+#     #     checkpoint_score_attribute="loss",
+#     #     checkpoint_score_order="max",
+#     # ),
+#     storage_path=str(RUN_DIR),
+#     verbose=1,
+#     progress_reporter=CLIReporter(
+#             metric_columns=["loss", "training_iteration"],
+#             sort_by_metric=True,
+#         ),
+# )
 
-# THIS is the highest level training object ran on each worker
-ray_trainer = TorchTrainer(
-    train,     
-    scaling_config=scaling_config,
-    run_config=run_config,
-    # BUG: maybe these params below should go alsewhere
-    run_tag=run_tag_in,
-    path_dict=path_dict,
-    config_dict=config_dict,
-)
+# # THIS is the highest level training object ran on each worker
+# ray_trainer = TorchTrainer(
+#     train,     
+#     scaling_config=scaling_config,
+#     run_config=run_config,
+# )
 
 # -------------------Main Function----------------------------------
 def main(
@@ -156,6 +152,34 @@ def main(
 
     RUN_DIR.mkdir(parents=True)
     shutil.copyfile(__file__, RUN_DIR / Path(__file__).name)
+    
+    scaling_config = ScalingConfig(    
+        num_workers=3,  # number of distributed workers - should match total trials?
+        use_gpu=True,    # whether each worker should use a gpu
+        resources_per_worker={"CPU": 1, "GPU": 1},   # default, but consider cluster architecture to change
+        placement_strategy="SPREAD",   # PACK favors memory (locality) and SPREAD favors speed
+    )
+
+    run_config = RunConfig(           
+    # checkpoint_config=CheckpointConfig(
+    #     num_to_keep=3,   # TODO: what is this??
+    #     checkpoint_score_attribute="loss",
+    #     checkpoint_score_order="max",
+    # ),
+        storage_path=str(RUN_DIR),
+        verbose=1,
+        progress_reporter=CLIReporter(
+                metric_columns=["loss", "training_iteration"],
+                sort_by_metric=True,
+            ),
+    )
+
+    # # THIS is the highest level training object ran on each worker
+    # ray_trainer = TorchTrainer(
+    #     train,     
+    #     scaling_config=scaling_config,
+    #     run_config=run_config,
+    # )
     
     # tune.run(
     #     tune.with_parameters(train,run_tag=run_tag_in,path_dict=path_dict,config_dict=config_dict),   # DONE - torchtrainer
@@ -174,10 +198,15 @@ def main(
     #     ),
     #     trial_dirname_creator=trial_function,
     # )
+    
+    ray_tran_objective = TorchTrainer(
+            tune.with_parameters(train,run_tag=run_tag_in,path_dict=path_dict,config_dict=config_dict),  # BUG: check this passing
+            scaling_config=scaling_config,
+            run_config=run_config,
+        )
 
     tuner_object = tune.Tuner(
-        ray_trainer,
-        param_space={"train_loop_config": SEARCH_SPACE},   # TODO: is this right?
+        ray_train_objective,
         tune_config=tune.TuneConfig(
             metric="loss",
             mode="min",
@@ -186,6 +215,7 @@ def main(
             scheduler=FIFOScheduler(),    # TODO: exploit others
             trial_dirname_creator=trial_function,
         )
+        param_space={"train_loop_config": SEARCH_SPACE},   # TODO: is this right?
     )
 
     # start Ray Tune, can retrieve results with tuner_object.get_results()

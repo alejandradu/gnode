@@ -15,7 +15,7 @@ import ray.train.lightning as rtl
 log = logging.getLogger(__name__)
 
 
-def train(   # this wraps the pl trainer in a train_func
+def train(   
     overrides: dict = {},
     config_dict: dict = {},
     run_tag: str = "",
