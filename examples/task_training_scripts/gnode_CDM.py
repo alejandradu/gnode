@@ -11,19 +11,22 @@ from ray import tune   # uses ray 1.13. ctrl+c stops the training
 from ray.tune import CLIReporter
 from ray.tune.schedulers import FIFOScheduler
 from ray.tune.search.basic_variant import BasicVariantGenerator
+from ray.train import RunConfig, ScalingConfig, CheckpointConfig
+from ray.train.torch import TorchTrainer
 
 from ctd.task_modeling.task_train_prep import train
 from utils import make_data_tag, trial_function
-from line_profiler import profile
-import cProfile
-import pstats
 
 # Add custom resolver to create the data_tag so it can be used for run dir
 OmegaConf.register_new_resolver("make_data_tag", make_data_tag)
 log = logging.getLogger(__name__)
 
+# TODO: major change - from the tune.run method to the Tuner API, to support distributed training
+# TODO: integrate the tas_train_prep with the tune object creation here (implement lightning and ray in one file)
+# leave the highest level user interface only to choose algs, schedulers, params, and search configs
+
 # ---------------Options---------------
-LOCAL_MODE = False  # Set to True to run locally (for debugging)
+LOCAL_MODE = False  # Set to True to run locally (for debugging) but also to distribute across clusters
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
@@ -47,15 +50,15 @@ SEARCH_SPACE = dict(
     ),
     trainer=dict(
         # Trainer Parameters 
-        max_epochs=tune.choice([2]),
+        max_epochs=tune.choice([5]),
         log_every_n_steps=tune.choice([1]),
     ),
     # Data Parameters 
     params=dict(
         seed=tune.grid_search([0]),
-        batch_size=tune.choice([128]),
-        num_workers=tune.choice([1]),
-        n_samples=tune.choice([1000]),  
+        batch_size=tune.choice([32, 64]),  
+        num_workers=tune.choice([1, 10]),   # TODO: so these are just for dataloading, not the workers=nodes Ray uses?
+        n_samples=tune.choice([256]),      # TODO: this has to be much more
     ),
     # task parameters
     env_task=dict(
@@ -106,6 +109,39 @@ if not WANDB_LOGGING:
     config_dict["loggers"] = Path("configs/logger/default_no_wandb.yaml")
     config_dict["callbacks"] = Path("configs/callbacks/default_no_wandb.yaml")
 
+# ------------- Settings for parallel training -------------------------
+
+scaling_config = ScalingConfig(    
+    num_workers=4,  # number of distributed workers - should match total trials?
+    use_gpu=True,    # whether each worker should use a gpu
+    resources_per_worker={"CPU": 1, "GPU": 1},   # default, but consider cluster architecture to change
+    placement_strategy="SPREAD",   # PACK favors memory (locality) and SPREAD favors speed
+)
+
+run_config = RunConfig(           
+    # checkpoint_config=CheckpointConfig(
+    #     num_to_keep=3,   # TODO: what is this??
+    #     checkpoint_score_attribute="loss",
+    #     checkpoint_score_order="max",
+    # ),
+    storage_path=str(RUN_DIR),
+    verbose=1,
+    progress_reporter=CLIReporter(
+            metric_columns=["loss", "training_iteration"],
+            sort_by_metric=True,
+        ),
+)
+
+# THIS is the highest level training object ran on each worker
+ray_trainer = TorchTrainer(
+    train,     
+    scaling_config=scaling_config,
+    run_config=run_config,
+    # BUG: maybe these params below should go alsewhere
+    run_tag=run_tag_in,
+    path_dict=path_dict,
+    config_dict=config_dict,
+)
 
 # -------------------Main Function----------------------------------
 def main(
@@ -121,30 +157,39 @@ def main(
     RUN_DIR.mkdir(parents=True)
     shutil.copyfile(__file__, RUN_DIR / Path(__file__).name)
     
-    pr = cProfile.Profile()
-    pr.enable()
-    
-    tune.run(
-        tune.with_parameters(train,run_tag=run_tag_in,path_dict=path_dict,config_dict=config_dict),
-        metric="loss",
-        mode="min", 
-        config=SEARCH_SPACE,
-        resources_per_trial=dict(cpu=1, gpu=1), 
-        num_samples=1,                      # HERE: number of times to sample from hyperparam space
-        storage_path=str(RUN_DIR),
-        search_alg=BasicVariantGenerator(),
-        scheduler=FIFOScheduler(),
-        verbose=1,
-        progress_reporter=CLIReporter(
-            metric_columns=["loss", "training_iteration"],
-            sort_by_metric=True,
-        ),
-        trial_dirname_creator=trial_function,
-    )
-    
-    pr.disable()
-    pr.dump_stats(RUN_TAG + "_profile")
+    # tune.run(
+    #     tune.with_parameters(train,run_tag=run_tag_in,path_dict=path_dict,config_dict=config_dict),   # DONE - torchtrainer
+    #     metric="loss",   # DONE - in tuner object
+    #     mode="min",     # DONE - in tuner object
+    #     config=SEARCH_SPACE,  # DONE - in tuner object
+    #     resources_per_trial=dict(cpu=1, gpu=1),    # DONE - runconfig
+    #     num_samples=1,                  # DONE - in tuner object
+    #     storage_path=str(RUN_DIR),   #DONE - runconfig
+    #     search_alg=BasicVariantGenerator(),
+    #     scheduler=FIFOScheduler(),
+    #     verbose=1,   #DONE - runconfig
+    #     progress_reporter=CLIReporter(    #DONE - runconfig
+    #         metric_columns=["loss", "training_iteration"],
+    #         sort_by_metric=True,
+    #     ),
+    #     trial_dirname_creator=trial_function,
+    # )
 
+    tuner_object = tune.Tuner(
+        ray_trainer,
+        param_space={"train_loop_config": SEARCH_SPACE},   # TODO: is this right?
+        tune_config=tune.TuneConfig(
+            metric="loss",
+            mode="min",
+            num_samples=1,    # TODO: should this be more?
+            search_alg=BasicVariantGenerator(),   # TODO: exploit others
+            scheduler=FIFOScheduler(),    # TODO: exploit others
+            trial_dirname_creator=trial_function,
+        )
+    )
+
+    # start Ray Tune, can retrieve results with tuner_object.get_results()
+    tuner_object.fit()
 
 if __name__ == "__main__":
     main(

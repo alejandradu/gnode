@@ -10,11 +10,12 @@ from gymnasium import Env
 
 from ctd.task_modeling.simulator.neural_simulator import NeuralDataSimulator
 from utils import flatten
+import ray.train.lightning as rtl 
 
 log = logging.getLogger(__name__)
 
 
-def train(
+def train(   # this wraps the pl trainer in a train_func
     overrides: dict = {},
     config_dict: dict = {},
     run_tag: str = "",
@@ -118,11 +119,11 @@ def train(
     )
     datamodule.set_environment(data_env=task_env)
 
-    # # -----Step 5:----------------Instantiate simulator---------------------------
-    # log.info("Instantiating neural data simulator")
-    # simulator: NeuralDataSimulator = hydra.utils.instantiate(
-    #     config_all["simulator"], _convert_="all"
-    # )
+    # -----Step 5:----------------Instantiate simulator---------------------------
+    log.info("Instantiating neural data simulator")
+    simulator: NeuralDataSimulator = hydra.utils.instantiate(
+        config_all["simulator"], _convert_="all"
+    )
 
     # -----Step 6:-----------------Instantiate callbacks---------------------------
     callbacks: List[pl.Callback] = []
@@ -158,19 +159,22 @@ def train(
     trainer: pl.Trainer = hydra.utils.instantiate(
         config_all["trainer"],
         logger=logger,
-        callbacks=callbacks,
+        callbacks=[callbacks, rtl.RayTrainReportCallback()],   # keep monitoring progress in parallel
         accelerator="auto",
         _convert_="all",
+        devices="auto",
+        strategy = rtl.RayDDPStrategy(),     # distributed data parallel strategy
+        plugins = [rtl.RayLightningEnvironment()],
     )
 
+    trainer = rtl.prepare_trainer(trainer)    # validate configurations BUG: is this right?
+    
     # -------Step 9.1:-----------------Train model---------------------------
     log.info("Training model")
     trainer.fit(model=task_wrapper, datamodule=datamodule)
     
-    
     # ------Step 9.2:---------- Test model ---------------------------
     trainer.test(model=task_wrapper, datamodule=datamodule)
-    
 
     # -------Step 10:----------Save model and datamodule---------------------------
     log.info("Saving model and datamodule")
@@ -187,34 +191,34 @@ def train(
     with open(path2, "wb") as f:
         pickle.dump(datamodule, f)
 
-    # # ------Step 11:------------Instantiate sim datamodule---------------------------
-    # log.info("Instantiating datamodule for neural simulation")
-    # sim_datamodule: pl.LightningDataModule = hydra.utils.instantiate(
-    #     config_all["datamodule_sim"], _convert_="all"
-    # )
-    # sim_datamodule.set_environment(
-    #     data_env=sim_env,
-    #     for_sim=True,
-    # )
-    # sim_datamodule.prepare_data()
-    # sim_datamodule.setup()
+    # ------Step 11:------------Instantiate sim datamodule---------------------------
+    log.info("Instantiating datamodule for neural simulation")
+    sim_datamodule: pl.LightningDataModule = hydra.utils.instantiate(
+        config_all["datamodule_sim"], _convert_="all"
+    )
+    sim_datamodule.set_environment(
+        data_env=sim_env,
+        for_sim=True,
+    )
+    sim_datamodule.prepare_data()
+    sim_datamodule.setup()
 
-    # task_wrapper.set_environment(sim_env)
-    # # ------Step 12:------------Simulate neural data---------------------------
-    # simulator.simulate_neural_data(
-    #     task_trained_model=task_wrapper,
-    #     datamodule=sim_datamodule,
-    #     run_tag=run_tag,
-    #     dataset_path=path_dict["dt_datasets"],
-    #     subfolder=subfolder,
-    #     seed=0,
-    # )
+    task_wrapper.set_environment(sim_env)
+    # ------Step 12:------------Simulate neural data---------------------------
+    simulator.simulate_neural_data(
+        task_trained_model=task_wrapper,
+        datamodule=sim_datamodule,
+        run_tag=run_tag,
+        dataset_path=path_dict["dt_datasets"],
+        subfolder=subfolder,
+        seed=0,
+    )
 
-    # # ------Step 13:--------Save simulator and sim datamodule------------
-    # path3 = os.path.join(SAVE_PATH, run_tag, subfolder, "simulator.pkl")
-    # with open(path3, "wb") as f:
-    #     pickle.dump(simulator, f)
+    # ------Step 13:--------Save simulator and sim datamodule------------
+    path3 = os.path.join(SAVE_PATH, run_tag, subfolder, "simulator.pkl")
+    with open(path3, "wb") as f:
+        pickle.dump(simulator, f)
 
-    # path3 = os.path.join(SAVE_PATH, run_tag, subfolder, "datamodule_sim.pkl")
-    # with open(path3, "wb") as f:
-    #     pickle.dump(sim_datamodule, f)
+    path3 = os.path.join(SAVE_PATH, run_tag, subfolder, "datamodule_sim.pkl")
+    with open(path3, "wb") as f:
+        pickle.dump(sim_datamodule, f)

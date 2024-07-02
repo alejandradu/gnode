@@ -40,15 +40,12 @@ class Analysis_TT(Analysis):
         # so I am calculating the field for something with set inputs and targets
         self.model = self.wrapper.model
         if use_train_dm:
-            # with open(filepath + "datamodule_train.pkl", "rb") as f:
-            #     self.datamodule = torch.load(f, map_location=torch.device('cpu'))
-            #     #self.datamodule = pickle.load(f)
-            #     self.datamodule.prepare_data()
-            #     self.datamodule.setup()
-            f = filepath + "datamodule_train.pkl"
-            self.datamodule = torch.load(f, map_location=torch.device('cpu'))
-            self.datamodule.prepare_data()
-            self.datamodule.setup()
+            with open(filepath + "datamodule_train.pkl", "rb") as f:
+                #self.datamodule = torch.load(f, map_location=torch.device('cpu'))
+                #self.datamodule = pickle.load(f)
+                self.datamodule = torch.load(f, map_location=lambda storage, loc: storage.cpu())
+                self.datamodule.prepare_data()
+                self.datamodule.setup()
         else:
             with open(filepath + "datamodule_sim.pkl", "rb") as f:
                 self.datamodule = pickle.load(f)

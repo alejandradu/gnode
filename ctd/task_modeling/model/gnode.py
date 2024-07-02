@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from line_profiler import profile
 
 # Implement a gated neural ordinary differential equation (gNODE)
 # architecture for a neural network based on the implementation of
