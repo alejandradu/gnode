@@ -4,11 +4,12 @@
 # Ray finds and manages all resources on each nodes
 # Give access to all resources in one node
 
-#SBATCH --nodes=4                # total number of hyperparam combinations  
+#SBATCH --nodes=1                # total number of hyperparam combinations  - might work for any number
+                                 # the constraint might be the Della configs letting me submit the task        
 #SBATCH --exclusive
-#SBATCH --ntasks-per-node=1       
+#SBATCH --tasks-per-node=1    
 
-# REMEBER TO SET CPU/GPU VARIABLES BELOW
+# REMEMBER TO SET CPU/GPU VARIABLES BELOW
 
 #SBATCH --cpus-per-task=1        # cpu-cores per task (>1 if multi-threaded tasks)
 #SBATCH --gpus-per-task=1        # number of gpus per task

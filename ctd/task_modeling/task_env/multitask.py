@@ -43,7 +43,6 @@ class MultiTaskWrapper(DecoupledEnvironment):
             dataset_name: Name of the dataset
             - Default = "MultiTask"
         """
-        # TODO: Seed environment
         self.n_timesteps = n_timesteps
         self.dataset_name = dataset_name
         self.bin_size = bin_size
@@ -110,6 +109,9 @@ class MultiTaskWrapper(DecoupledEnvironment):
             self.sampler = RandomSampler
         self.loss_func = MultiTaskLoss(lat_loss_weight=self.latent_l2_wt)
 
+    def set_seed(self, seed):
+        np.random.seed(seed)
+        
     def step(self, action):
         pass
 

@@ -10,7 +10,7 @@ from gymnasium import Env
 
 from ctd.task_modeling.simulator.neural_simulator import NeuralDataSimulator
 from utils import flatten
-import ray.train.lightning as rtl 
+from ray.train.lightning import RayLightningEnvironment#, RayTrainReportCallback
 
 log = logging.getLogger(__name__)
 
@@ -159,15 +159,11 @@ def train(
     trainer: pl.Trainer = hydra.utils.instantiate(
         config_all["trainer"],
         logger=logger,
-        callbacks=[callbacks, rtl.RayTrainReportCallback()],   # keep monitoring progress in parallel
+        callbacks=callbacks,
         accelerator="auto",
         _convert_="all",
-        devices="auto",
-        strategy = rtl.RayDDPStrategy(),     # distributed data parallel strategy
-        plugins = [rtl.RayLightningEnvironment()],
+        #plugins=[RayLightningEnvironment()],
     )
-
-    trainer = rtl.prepare_trainer(trainer)    # validate configurations BUG: is this right?
     
     # -------Step 9.1:-----------------Train model---------------------------
     log.info("Training model")

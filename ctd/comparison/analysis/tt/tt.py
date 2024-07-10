@@ -58,7 +58,9 @@ class Analysis_TT(Analysis):
                 self.simulator = pickle.load(f)
         n_train = len(self.datamodule.train_ds)
         n_val = len(self.datamodule.valid_ds)
-        self.n_trials = n_train + n_val
+        n_test = len(self.datamodule.test_ds)
+        self.n_trials = n_train + n_val + n_test
+        # TODO: was the splitting really guaranteed to be in order?
         self.train_inds = range(0, int(0.8 * self.n_trials))
         self.valid_inds = range(int(0.8 * self.n_trials), self.n_trials)
 
