@@ -1,9 +1,6 @@
 import logging
 import os
 import pickle
-import time
-import hashlib
-import datetime
 
 import dotenv
 import h5py
@@ -17,7 +14,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from ctd.task_modeling.datamodule.samplers import RandomSampler, SequentialSampler
 
 dotenv.load_dotenv(override=True)
-HOME_DIR = os.getenv("HOME_DIR", "/scratch/gpfs/ad2002/")
+HOME_DIR = os.getenv("HOME_DIR")
 
 
 def save_dict_to_pickle(dic, filename):
@@ -65,6 +62,10 @@ class TaskDataModule(pl.LightningDataModule):
         """
         super().__init__()
         self.save_hyperparameters()
+        # Set the random seed
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+
         # Generate the dataset tag
         self.data_env = data_env
         self.name = None
@@ -82,7 +83,6 @@ class TaskDataModule(pl.LightningDataModule):
             f"{data_env.dataset_name}_{self.hparams.n_samples}S_{data_env.n_timesteps}T"
             f"_{self.hparams.seed}seed"
         )
-    
         # if data_env has a noise parameter, add it to the name
         if hasattr(data_env, "noise"):
             self.name += f"_{data_env.noise}"
@@ -103,7 +103,7 @@ class TaskDataModule(pl.LightningDataModule):
             self.sampler_func = RandomSampler
             self.val_sampler_func = SequentialSampler
 
-    def prepare_data(self):    
+    def prepare_data(self):
         """Prepare the data for task-training
 
         All task-environments must have a generate_dataset method,
@@ -143,11 +143,9 @@ class TaskDataModule(pl.LightningDataModule):
             logger.info(f"Loading dataset {self.name}")
             return
         logger.info(f"Generating dataset {self.name}")
-        
         np.random.seed(self.hparams.seed)
         torch.manual_seed(self.hparams.seed)
         self.data_env.set_seed(self.hparams.seed)
-
         # Simulate the task
         dataset_dict, extra_dict = self.data_env.generate_dataset(
             self.hparams.n_samples
@@ -165,20 +163,17 @@ class TaskDataModule(pl.LightningDataModule):
         # Perform data splits
         num_trials = ics_ds.shape[0]
         inds = np.arange(num_trials)
-        # splitting the trials 
-        train_inds, test_inds = train_test_split(inds, test_size=0.15, random_state=hps.seed)
-        train_inds, valid_inds = train_test_split(train_inds, test_size=0.15, random_state=hps.seed)
-        
+        train_inds, valid_inds = train_test_split(
+            inds, test_size=0.2, random_state=hps.seed
+        )
 
         # Save the data used to train the model
         with h5py.File(fpath, "w") as h5file:
             h5file.create_dataset("train_ics", data=ics_ds[train_inds])
             h5file.create_dataset("valid_ics", data=ics_ds[valid_inds])
-            h5file.create_dataset("test_ics", data=ics_ds[test_inds]) 
 
             h5file.create_dataset("train_inputs", data=inputs_ds[train_inds])
             h5file.create_dataset("valid_inputs", data=inputs_ds[valid_inds])
-            h5file.create_dataset("test_inputs", data=inputs_ds[test_inds])
 
             h5file.create_dataset(
                 "train_inputs_to_env", data=inputs_to_env_ds[train_inds]
@@ -186,39 +181,26 @@ class TaskDataModule(pl.LightningDataModule):
             h5file.create_dataset(
                 "valid_inputs_to_env", data=inputs_to_env_ds[valid_inds]
             )
-            h5file.create_dataset(
-                "test_inputs_to_env", data=inputs_to_env_ds[test_inds] 
-            )
 
             h5file.create_dataset("train_targets", data=targets_ds[train_inds])
             h5file.create_dataset("valid_targets", data=targets_ds[valid_inds])
-            h5file.create_dataset("test_targets", data=targets_ds[test_inds])
 
             h5file.create_dataset("train_conds", data=conds_ds[train_inds])
             h5file.create_dataset("valid_conds", data=conds_ds[valid_inds])
-            h5file.create_dataset("test_conds", data=conds_ds[test_inds])
 
             h5file.create_dataset("train_inds", data=train_inds)
             h5file.create_dataset("valid_inds", data=valid_inds)
-            h5file.create_dataset("test_inds", data=test_inds)
 
             h5file.create_dataset("train_extra", data=extra_ds[train_inds])
             h5file.create_dataset("valid_extra", data=extra_ds[valid_inds])
-            h5file.create_dataset("test_extra", data=extra_ds[test_inds])
 
             h5file.create_dataset("train_true_inputs", data=true_inputs_ds[train_inds])
             h5file.create_dataset("valid_true_inputs", data=true_inputs_ds[valid_inds])
-            h5file.create_dataset("test_true_inputs", data=true_inputs_ds[test_inds])
 
         # Save extra information for plotting, offline analyses etc.
         save_dict_to_pickle(extra_dict, fpath_pkl)
 
     def setup(self, stage=None):
-        # Define steps that should be done on 
-    # every GPU, like splitting data, applying
-    # transform etc.
-    # generally loading data
-    
         # Load data arrays from file
         if self.for_sim:
             data_path = os.path.join(
@@ -234,44 +216,37 @@ class TaskDataModule(pl.LightningDataModule):
             data_path_pkl = os.path.join(
                 HOME_DIR, "content", "datasets", "tt", f"{self.name}.pkl"
             )
-                
+
         with h5py.File(data_path, "r") as h5file:
             train_ics = to_tensor(h5file["train_ics"][()])
             valid_ics = to_tensor(h5file["valid_ics"][()])
-            test_ics = to_tensor(h5file["test_ics"][()])
 
             train_inputs = to_tensor(h5file["train_inputs"][()])
             valid_inputs = to_tensor(h5file["valid_inputs"][()])
-            test_inputs = to_tensor(h5file["test_inputs"][()])
 
             train_inputs_to_env = to_tensor(h5file["train_inputs_to_env"][()])
             valid_inputs_to_env = to_tensor(h5file["valid_inputs_to_env"][()])
-            test_inputs_to_env = to_tensor(h5file["test_inputs_to_env"][()])
 
             train_targets = to_tensor(h5file["train_targets"][()])
             valid_targets = to_tensor(h5file["valid_targets"][()])
-            test_targets = to_tensor(h5file["test_targets"][()])
 
             train_conds = to_tensor(h5file["train_conds"][()])
             valid_conds = to_tensor(h5file["valid_conds"][()])
-            test_conds = to_tensor(h5file["test_conds"][()])
 
             # Load the indices
             train_inds = to_tensor(h5file["train_inds"][()])
             valid_inds = to_tensor(h5file["valid_inds"][()])
-            test_inds = to_tensor(h5file["test_inds"][()])
+            # test_inds = to_tensor(h5file["test_inds"][()])
 
             train_extra = to_tensor(h5file["train_extra"][()])
             valid_extra = to_tensor(h5file["valid_extra"][()])
-            test_extra = to_tensor(h5file["test_extra"][()])
 
             train_true_inputs = to_tensor(h5file["train_true_inputs"][()])
             valid_true_inputs = to_tensor(h5file["valid_true_inputs"][()])
-            test_true_inputs = to_tensor(h5file["test_true_inputs"][()])
 
         self.extra_data = load_dict_from_pickle(data_path_pkl)
 
-        # Store datasets 
+        # Store datasets
         self.train_ds = TensorDataset(
             train_ics,
             train_inputs,
@@ -293,27 +268,12 @@ class TaskDataModule(pl.LightningDataModule):
             valid_inputs_to_env,
             valid_true_inputs,
         )
-        
-        self.test_ds = TensorDataset(
-            test_ics,
-            test_inputs,
-            test_targets,
-            test_inds,
-            test_conds,
-            test_extra,
-            test_inputs_to_env,
-            test_true_inputs,
-        )
 
         self.train_sampler = self.sampler_func(
             data_source=self.train_ds, num_samples=self.hparams.batch_size
         )
         self.valid_sampler = self.val_sampler_func(
             data_source=self.valid_ds, num_samples=self.hparams.batch_size
-        )
-        # also use SequentialSampler for test
-        self.test_sampler = self.val_sampler_func(
-            data_source=self.test_ds, num_samples=self.hparams.batch_size
         )
 
     def train_dataloader(self, shuffle=True):
@@ -334,12 +294,3 @@ class TaskDataModule(pl.LightningDataModule):
             num_workers=self.hparams.num_workers,
         )
         return valid_dl
-    
-    def test_dataloader(self):
-        test_dl = DataLoader(
-            self.test_ds,
-            batch_sampler=self.test_sampler,
-            # batch_size=self.hparams.batch_size,
-            num_workers=self.hparams.num_workers,
-        )
-        return test_dl

@@ -109,8 +109,6 @@ class TaskTrainedWrapper(pl.LightningModule):
                 (i.e., the outputs of the environment or MotorNet goal)
 
         """
-        self.model.to(self.device)  # BUG: need to have all tensors on the same device
-        
         batch_size = ics.shape[0]
 
         # If a coupled environment, set the environment state
@@ -127,7 +125,7 @@ class TaskTrainedWrapper(pl.LightningModule):
 
         # Call initializations (if they exist)
         if hasattr(self.model, "init_hidden"):
-            hidden = self.model.init_hidden(batch_size=batch_size).to(self.device)  # device is inherited from LightningModule
+            hidden = self.model.init_hidden(batch_size=batch_size).to(self.device)
         else:
             hidden = torch.zeros(batch_size, self.latent_size).to(self.device)
 
@@ -228,7 +226,6 @@ class TaskTrainedWrapper(pl.LightningModule):
         self.log("train/loss", loss_all)
         return loss_all
 
-    #profile
     def validation_step(self, batch, batch_ix):
         ics = batch[0]
         inputs = batch[1]
@@ -257,34 +254,4 @@ class TaskTrainedWrapper(pl.LightningModule):
         if hasattr(self.model, "model_loss"):
             loss_all += self.model.model_loss(loss_dict)
         self.log("valid/loss", loss_all)
-        return loss_all
-
-    def test_step(self, batch, batch_ix):
-        ics = batch[0]
-        inputs = batch[1]
-        targets = batch[2]
-        conds = batch[4]
-        extras = batch[5]
-        inputs_to_env = batch[6]
-
-        # Pass data through the model
-        output_dict = self.forward(ics, inputs, inputs_to_env=inputs_to_env)
-
-        # Compute the weighted loss
-        loss_dict = {
-            "controlled": output_dict["controlled"],
-            "actions": output_dict["actions"],
-            "latents": output_dict["latents"],
-            "targets": targets,
-            "inputs": inputs,
-            "conds": conds,
-            "extra": extras,
-            "epoch": self.current_epoch,
-        }
-
-        # Compute the loss using the loss function object
-        loss_all = self.loss_func(loss_dict)
-        if hasattr(self.model, "model_loss"):
-            loss_all += self.model.model_loss(loss_dict)
-        self.log("test/loss", loss_all)
         return loss_all

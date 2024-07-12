@@ -55,6 +55,8 @@ class gNODE(nn.Module):
         nn.init.constant_(self.readout.bias, 0.0)  # Zero bias initialization
         
     #@profile
+    # TODO: revise this (it was wrong!!!)
+    # want to implement another class entirely - do not use MLP
     def generator(self, inputs, hidden):
         if self.gating_linear:
             return self.dt * (self.gating(hidden) * (self.dynamics(inputs, hidden) - hidden)) + hidden

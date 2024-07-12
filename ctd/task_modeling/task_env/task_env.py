@@ -5,12 +5,9 @@ import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
 from gymnasium import spaces
-from motornet.environment import Environment
-from numpy import ndarray
-from torch._tensor import Tensor
-import textwrap
 
 from ctd.task_modeling.task_env.loss_func import NBFFLoss
+
 
 class DecoupledEnvironment(gym.Env, ABC):
     """
@@ -21,8 +18,6 @@ class DecoupledEnvironment(gym.Env, ABC):
 
     # All decoupled environments should have
     # a number of timesteps and a noise parameter
-    # TODO: the rest of the methods actually require more: 
-    # action_space, observation_space, context_inputs, state_label, input_labels, output_labels, coupled_env, loss_func
 
     @abstractmethod
     def __init__(self, n_timesteps: int, noise: float):
@@ -94,7 +89,21 @@ class NBitFlipFlop(DecoupledEnvironment):
         self.transition_blind = transition_blind
         self.loss_func = NBFFLoss(transition_blind=transition_blind)
 
+    def set_seed(self, seed):
+        np.random.seed(seed)
+
     def step(self, action):
+        """
+        Generates a state update given an input to the flip-flop
+
+        TODO: Revise
+
+        Args:
+            action (TODO: dtype) :
+
+        Returns:
+            None
+        """
         # Generates state update given an input to the flip-flop
         for i in range(self.n):
             if action[i] == 1:
@@ -129,10 +138,33 @@ class NBitFlipFlop(DecoupledEnvironment):
         return inputs, outputs, true_inputs
 
     def reset(self):
+        """
+        Resets the state of the flip-flop
+
+        TODO: Revise
+
+        Args:
+            None
+
+        Returns:
+            state (TODO: dtype) :
+        """
         self.state = np.zeros(self.n)
         return self.state
 
     def generate_dataset(self, n_samples):
+        """
+        Generates a dataset for the NBFF task
+
+        TODO: Revise
+
+        Args:
+            n_samples (int) :
+
+        Returns:
+            dataset_dict (dict) :
+            extra_dict (dict) :
+        """
         # Generates a dataset for the NBFF task
         n_timesteps = self.n_timesteps
         ics_ds = np.zeros(shape=(n_samples, self.n))
@@ -172,10 +204,9 @@ class NBitFlipFlop(DecoupledEnvironment):
         ax2.set_ylim(-1.2, 1.2)
         ax2.set_xlabel("Time")
         ax2.set_ylabel("Inputs")
-        plt.figure(dpi=500)
-        #plt.tight_layout(pad=20.0)  # increase padding to 2.0
+        plt.tight_layout()
         plt.show()
-        #fig1.savefig("nbitflipflop.pdf")
+        fig1.savefig("nbitflipflop.pdf")
 
     def render_3d(self, n_trials=10):
         if self.n > 2:
@@ -192,186 +223,3 @@ class NBitFlipFlop(DecoupledEnvironment):
                 ax.set_title(f"Trial {i+1}")
             plt.tight_layout()
             plt.show()
-
-
-class OneBitSum(DecoupledEnvironment):
-    """
-    An environment for a 2-bit memory task.
-    The output bit is the sign of the sum of all previous pulses.
-    
-    noise: float, the standard deviation of the noise to add to the inputs
-    switch_prob: float, the probability of a bit flipping (if not Poisson, like NBFF)
-    transition_blind: int, the number of timesteps to ignore after a transition
-    limits: list, the limits of the sum (default is [-1, 1])
-    n: int, the number of pulses to send in a trial (average number of poisson)
-    poisson: bool, whether to use a poisson process for the pulses (NBFF bit flipping otherwise)
-    
-    """
-    
-    def __init__(self, n_timesteps: int, noise: float, switch_prob=0.05, transition_blind=1, n=1, limits = [-1, 1], poisson=True):
-        
-        super().__init__(n_timesteps=n_timesteps, noise=noise)
-        self.dataset_name = "OneBitSum"
-        self.action_space = spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
-        self.limits = limits
-        # this has always been in the range -1, 1
-        if limits is not None:
-            self.observation_space = spaces.Box(low=limits[0], high=limits[1], shape=(1,), dtype=np.float32)
-        else:
-            self.observation_space = spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
-        # below is effectively nothing
-        self.context_inputs = spaces.Box(low=-1.5, high=1.5, shape=(0,), dtype=np.float32)
-        # self.sum = 0
-        self.state = np.zeros(1)
-        self.n_timesteps = n_timesteps
-        self.noise = noise
-        self.switch_prob = switch_prob
-        # special just to plot the difference
-        # self.inputs_diff = np.zeros(n_timesteps)
-        self.loss_func = NBFFLoss(transition_blind=transition_blind)
-        # remaining attributes
-        self.input_labels = ["Input"]
-        self.output_labels = ["Output"]
-        self.coupled_env = False
-        self.transition_blind = transition_blind
-        self.n = n
-        self.poisson = poisson
-        
-    def simulate_poisson_process_single_arrivals(self):
-        # Calculate the rate parameter alpha
-        alpha = self.n / self.n_timesteps
-
-        # Generate inter-arrival times
-        inter_arrival_times = np.random.exponential(1/alpha, self.n)
-        inter_arrival_times_cumulative = np.cumsum(inter_arrival_times)
-
-        # Convert continuous time to discrete timesteps
-        arrival_indices = np.floor(inter_arrival_times_cumulative).astype(int)
-
-        # Create an array for the entire timestep period initialized to zero
-        arrivals = np.zeros(self.n_timesteps, dtype=int)
-
-        # Set the arrival indices to 1, ensuring no index is out of bounds or duplicated
-        # Use np.unique to ensure no index is repeated
-        filtered_indices = np.unique(arrival_indices[arrival_indices < self.n_timesteps])
-        arrivals[filtered_indices] = 1
-
-        return arrivals
-        
-        
-    def step(self, action):
-        self.state[0] = np.sign(action)
-        
-    def generate_trial(self):
-        self.reset()
-        
-        # Generate the times when the bit flips
-        inputRand = np.random.random(size=(self.n_timesteps,1))
-        inputs_bits = np.zeros((self.n_timesteps, 1))
-        
-        if self.limits is not None:
-            inputs_diff = np.zeros(self.n_timesteps)
-            this_sum = 0
-            # will always start at 0
-            inputs_bits[0] = 0
-            inputs_diff[0] = 0
-            
-            # get the time indices for sparse pulses
-            if self.poisson:
-                time_indices = self.simulate_poisson_process_single_arrivals()
-            else:
-                # Initialize an array of zeros
-                time_indices = np.zeros(self.n_timesteps)
-
-                # Select self.n random indices
-                random_indices = np.random.choice(range(self.n_timesteps), self.n, replace=False)
-
-                # Set the selected indices to 1
-                time_indices[random_indices] = 1
-                
-            # send pulses while keeping the sum
-            for i in range(2,self.n_timesteps):
-                if this_sum == self.limits[1] and time_indices[i] == 1:
-                    inputs_bits[i] = -1
-                elif this_sum == self.limits[0] and time_indices[i] == 1:
-                    inputs_bits[i] = 1
-                elif time_indices[i] == 1:
-                    inputs_bits[i] = np.random.choice([-1,1])
-                this_sum += inputs_bits[i]
-                inputs_diff[i] = this_sum
-        else:
-            inputs_bits[inputRand > (1 - self.switch_prob)] = 1  
-            inputs_bits[inputRand < (self.switch_prob)] = -1
-        
-        # Generate DESIRED outputs given inputs
-        outputs = np.zeros((self.n_timesteps,1))
-        for i in range(self.n_timesteps):
-            self.step(inputs_diff[i])
-            outputs[i,:] = self.state
-        
-        # Add noise to the inputs for the trial
-        noisy_inputs = inputs_bits + np.random.normal(loc=0.0, scale=self.noise, size=inputs_bits.shape)
-        return noisy_inputs, outputs, inputs_bits, inputs_diff
-        
-    def reset(self):
-        self.sum = 0
-        self.state = np.zeros(1)
-        return self.state
-    
-    def generate_dataset(self, n_samples):
-        # Generates a dataset for the NBFF task
-        # NOTE are we initializing always with zeros?
-        ics_ds = np.zeros(shape=(n_samples, 1))
-        outputs_ds = np.zeros(shape=(n_samples, self.n_timesteps, 1))
-        inputs_ds = np.zeros(shape=(n_samples, self.n_timesteps, 1))
-        true_inputs_ds = np.zeros(shape=(n_samples, self.n_timesteps, 1))
-        for i in range(n_samples):
-            inputs, outputs, true_inputs, _ = self.generate_trial()
-            outputs_ds[i, :, :] = outputs
-            inputs_ds[i, :, :] = inputs
-            true_inputs_ds[i, :, :] = true_inputs
-
-        dataset_dict = {
-            "ics": ics_ds,
-            "inputs": inputs_ds,
-            "inputs_to_env": np.zeros(shape=(n_samples, self.n_timesteps, 0)),
-            "targets": outputs_ds,
-            "true_inputs": true_inputs_ds,
-            "conds": np.zeros(shape=(n_samples,1)),
-            # No extra info for this task, so just fill with zeros
-            "extra": np.zeros(shape=(n_samples, 1)),
-        }
-        return dataset_dict
-    
-    def render(self):
-        # Generate the trial data
-        inputs, outputs, true_inputs, inputs_diff = self.generate_trial()
-
-        # Create a figure
-        fig, axs = plt.subplots(nrows=4, ncols=1, sharex=True)
-
-        # Plot true_inputs
-        axs[0].plot(true_inputs[:,0], color='g')
-        axs[0].set_ylabel("\n".join(textwrap.wrap("Noiseless Inputs", 12)))
-
-        # Plot inputs
-        axs[1].plot(inputs[:,0], color='r')
-        axs[1].set_ylabel("\n".join(textwrap.wrap("Inputs", 12)))
-
-        # Plot accumulated difference
-        axs[2].plot(inputs_diff, color='k')
-        axs[2].set_ylabel("\n".join(textwrap.wrap("Accumulated input sum", 12)))
-
-        # Plot outputs
-        axs[3].plot(outputs[:,0], color='b')
-        axs[3].set_ylabel("\n".join(textwrap.wrap("Targets", 12)))
-
-        # Set the x-label for the last subplot
-        axs[3].set_xlabel("Time")
-
-        plt.figure(dpi=500)
-        # Display the plot
-        plt.show()
-
-        plt.figure(dpi=500)
-        # Display the

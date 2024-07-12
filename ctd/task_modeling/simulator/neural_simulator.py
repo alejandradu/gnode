@@ -3,7 +3,6 @@ import os
 import h5py
 import numpy as np
 import torch
-from sklearn.model_selection import train_test_split
 
 
 def generate_samples(activity, index_of_dispersion, rng):
@@ -93,6 +92,25 @@ class NeuralDataSimulator:
     def simulate_neural_data(
         self, task_trained_model, datamodule, run_tag, subfolder, dataset_path, seed=0
     ):
+        """
+        Simulate neural data from a task-trained model
+
+        TODO: REVISE
+
+        Args:
+            task_trained_model (TODO: dtype):
+            datamodule (Union[BasicDataModule, TaskTrainedRNNDataModule]):
+            run_tag (str):
+            subfolder (str):
+            dataset_path (str): 
+            seed (int): Random seed used in data generation
+        
+        Returns:
+            data (np.ndarray):
+            inputs (np.ndarray):
+            activity (np.ndarray):
+            latents (np.ndarray):
+        """
 
         # Make a filename based on the system being modeled, the number of neurons,
         # the nonlinearity, the observation noise, the epoch number, the model type,
@@ -101,7 +119,6 @@ class NeuralDataSimulator:
         # Get trajectories and model predictions
         train_ds = datamodule.train_ds
         valid_ds = datamodule.valid_ds
-        test_ds = datamodule.test_ds
 
         ics = train_ds.tensors[0]
         inputs = train_ds.tensors[1]
@@ -110,14 +127,10 @@ class NeuralDataSimulator:
         ics_val = valid_ds.tensors[0]
         inputs_val = valid_ds.tensors[1]
         extra_val = valid_ds.tensors[5]
-        
-        ics_test = test_ds.tensors[0]
-        inputs_test = test_ds.tensors[1]
-        extra_test = test_ds.tensors[5]
 
-        ics = torch.cat((ics, ics_val, ics_test), dim=0)
-        inputs = torch.cat((inputs, inputs_val, inputs_test), dim=0)
-        extra = torch.cat((extra, extra_val, extra_test), dim=0)
+        ics = torch.cat((ics, ics_val), dim=0)
+        inputs = torch.cat((inputs, inputs_val), dim=0)
+        extra = torch.cat((extra, extra_val), dim=0)
 
         output_dict = task_trained_model(ics, inputs)
 
@@ -197,39 +210,31 @@ class NeuralDataSimulator:
         data = data.reshape(n_trials, n_times, self.n_neurons)
 
         # Perform data splits
-        train_inds = range(0, int(0.85**2 * n_trials))
-        valid_inds = range(int((0.85 - 0.85**2) * n_trials), int(0.85 * n_trials))
-        test_inds = range(int(0.85 * n_trials), n_trials)
+        train_inds = range(0, int(0.8 * n_trials))
+        valid_inds = range(int(0.8 * n_trials), n_trials)
 
         # Save the trajectories
         with h5py.File(fpath, "w") as h5file:
             h5file.create_dataset("train_encod_data", data=data[train_inds])
             h5file.create_dataset("valid_encod_data", data=data[valid_inds])
-            h5file.create_dataset("test_encod_data", data=data[test_inds])
 
             h5file.create_dataset("train_recon_data", data=data[train_inds])
             h5file.create_dataset("valid_recon_data", data=data[valid_inds])
-            h5file.create_dataset("test_recon_data", data=data[test_inds])
 
             h5file.create_dataset("train_inputs", data=inputs[train_inds])
             h5file.create_dataset("valid_inputs", data=inputs[valid_inds])
-            h5file.create_dataset("test_inputs", data=inputs[test_inds])
 
             h5file.create_dataset("train_activity", data=activity[train_inds])
             h5file.create_dataset("valid_activity", data=activity[valid_inds])
-            h5file.create_dataset("test_activity", data=activity[test_inds])
 
             h5file.create_dataset("train_latents", data=latents[train_inds])
             h5file.create_dataset("valid_latents", data=latents[valid_inds])
-            h5file.create_dataset("test_latents", data=latents[test_inds])
 
             h5file.create_dataset("train_extra", data=extra[train_inds])
             h5file.create_dataset("valid_extra", data=extra[valid_inds])
-            h5file.create_dataset("test_extra", data=extra[test_inds])
 
             h5file.create_dataset("train_inds", data=train_inds)
             h5file.create_dataset("valid_inds", data=valid_inds)
-            h5file.create_dataset("test_inds", data=test_inds)
 
             h5file.create_dataset("readout", data=readout)
             h5file.create_dataset("orig_mean", data=orig_mean)
@@ -265,7 +270,6 @@ class NeuralDataSimulatorGeneral:
         # Step 1: Get trajectories and model predictions
         train_ds = datamodule.train_ds
         valid_ds = datamodule.valid_ds
-        test_ds = datamodule.test_ds
 
         ics = train_ds.tensors[0]
         inputs = train_ds.tensors[1]
@@ -274,14 +278,10 @@ class NeuralDataSimulatorGeneral:
         ics_val = valid_ds.tensors[0]
         inputs_val = valid_ds.tensors[1]
         extra_val = valid_ds.tensors[5]
-        
-        ics_test = test_ds.tensors[0]
-        inputs_test = test_ds.tensors[1]
-        extra_test = test_ds.tensors[5]
 
-        ics = torch.cat((ics, ics_val, ics_test), dim=0)
-        inputs = torch.cat((inputs, inputs_val, inputs_test), dim=0)
-        extra = torch.cat((extra, extra_val, extra_test), dim=0)
+        ics = torch.cat((ics, ics_val), dim=0)
+        inputs = torch.cat((inputs, inputs_val), dim=0)
+        extra = torch.cat((extra, extra_val), dim=0)
 
         output_dict = task_trained_model(ics, inputs)
         latents = output_dict["latents"]
@@ -358,6 +358,25 @@ class NeuralDataSimulatorGeneral:
     def simulate_neural_data(
         self, task_trained_model, datamodule, run_tag, subfolder, dataset_path, seed=0
     ):
+        """
+        Simulate neural data from a task-trained model
+
+        TODO: REVISE
+
+        Args:
+            task_trained_model (TODO: dtype):
+            datamodule (Union[BasicDataModule, TaskTrainedRNNDataModule]):
+            run_tag (str):
+            subfolder (str):
+            dataset_path (str): 
+            seed (int): Random seed used in data generation
+        
+        Returns:
+            data (np.ndarray):
+            inputs (np.ndarray):
+            activity (np.ndarray):
+            latents (np.ndarray):
+        """
 
         # Make a filename based on the system being modeled, the number of neurons,
         # the nonlinearity, the observation noise, the epoch number, the model type,
@@ -374,10 +393,9 @@ class NeuralDataSimulatorGeneral:
 
         n_trials, n_times, n_lat_dim = latents.shape
 
-        # Step 6: Perform data splits into train/valid - concatenated in order
-        train_inds = range(0, int(0.85**2 * n_trials))
-        valid_inds = range(int((0.85 - 0.85**2) * n_trials), int(0.85 * n_trials))
-        test_inds = range(int(0.85 * n_trials), n_trials)
+        # Step 6: Perform data splits into train/valid
+        train_inds = range(0, int(0.8 * n_trials))
+        valid_inds = range(int(0.8 * n_trials), n_trials)
 
         # Generate the filepath
         dt_folder = run_tag
@@ -404,31 +422,24 @@ class NeuralDataSimulatorGeneral:
         with h5py.File(fpath, "w") as h5file:
             h5file.create_dataset("train_encod_data", data=data[train_inds])
             h5file.create_dataset("valid_encod_data", data=data[valid_inds])
-            h5file.create_dataset("test_encod_data", data=data[test_inds])
 
             h5file.create_dataset("train_recon_data", data=data[train_inds])
             h5file.create_dataset("valid_recon_data", data=data[valid_inds])
-            h5file.create_dataset("test_recon_data", data=data[test_inds])
 
             h5file.create_dataset("train_inputs", data=inputs[train_inds])
             h5file.create_dataset("valid_inputs", data=inputs[valid_inds])
-            h5file.create_dataset("test_inputs", data=inputs[test_inds])
 
             h5file.create_dataset("train_activity", data=activity[train_inds])
             h5file.create_dataset("valid_activity", data=activity[valid_inds])
-            h5file.create_dataset("test_activity", data=activity[test_inds])
 
             h5file.create_dataset("train_latents", data=latents[train_inds])
             h5file.create_dataset("valid_latents", data=latents[valid_inds])
-            h5file.create_dataset("test_latents", data=latents[valid_inds])
 
             h5file.create_dataset("train_extra", data=extra[train_inds])
             h5file.create_dataset("valid_extra", data=extra[valid_inds])
-            h5file.create_dataset("test_extra", data=extra[valid_inds])
 
             h5file.create_dataset("train_inds", data=train_inds)
             h5file.create_dataset("valid_inds", data=valid_inds)
-            h5file.create_dataset("test_inds", data=valid_inds)
 
             h5file.create_dataset("readout", data=readout)
             h5file.create_dataset("orig_mean", data=self.orig_mean)

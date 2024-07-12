@@ -23,66 +23,23 @@ dotenv.load_dotenv(override=True)
 # ---------------Options---------------
 LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
-WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
+WANDB_LOGGING = True  # Set to True to log to WandB (need an account)
 
-MAX_EPOCHS = 100
-MODEL = "NODE"
-TASK = "MultiTask"
-task_detail = "CDM_1"   
-NUM_HYPERPARAM_SAMPLES = 1
-RESOURCES_PER_TRIAL = {"CPU": 1, "GPU": 0.25}   # around 0.25 gpu per node_cdm trial
-# TUNE_SEARCH_ALG=
-# TUNE_SCHEDULER=
-
-RUN_DESC = f"{MODEL}_{TASK}_{task_detail}_{MAX_EPOCHS}epoch"  # For WandB and run dir
+RUN_DESC = "NBFF_GRU_Replication"  # For WandB and run dir
+TASK = "NBFF"  # Task to train on (see configs/task_env for options)
+MODEL = "NoisyGRU"  # Model to train (see configs/model for options)
 
 # ----------------- Parameter Selection -----------------------------------
-
 SEARCH_SPACE = dict(
-    model = dict(
-        latent_size = tune.grid_search([2,3,5,10]),
-        # gating_linear = tune.grid_search([True]), 
-        # gating_n_layers = tune.grid_search([1,10])    ,  
-        # euler_step_size = tune.grid_search([0.1, 0.01]),
-    ),
-    # train loop configs
-    task_wrapper=dict(
-        weight_decay=1e-9,
-        learning_rate=1e-2,
-    ),
-    # pl.Trainer configs
     trainer=dict(
-        max_epochs=MAX_EPOCHS,  
-        log_every_n_steps=25,            # steps != epochs
+        # Trainer Parameters -----------------------------------
+        max_epochs=tune.choice([500]),
     ),
-    # configs for dataset (timeseries trials) creation
+    # Data Parameters -----------------------------------
     params=dict(
-        seed=0,
-        batch_size=tune.grid_search([32, 64, 128]),   
-        n_samples=1000,                   # number of trials to simulate
-        # num_workers=tune.choice([4]),  # for the DataLoader. != Ray workers. Usually set = CPUs
-    ),
-    # task parameters
-    env_task=dict(
-        task_list=["ContextIntMod1"],    # if using choice remember to use double brackets [[...]]
-        #latent_l2_wt=tune.grid_search([1e-6, 1e-3]),
-    ),
-    # simulation task params
-    env_sim=dict(
-        task_list=["ContextIntMod1"],
+        seed=tune.grid_search([0]),
     ),
 )
-
-# -------------------------- SLURM configs --------------------------
-# If not running DDP:
-
-# ntasks-per-node = total number of hyperparam combinations = trials 
-# cpus-per-task = CPU count in resources per trial 
-# gres:gpu = GPU count in resources per trial * trials
-
-# If running DDP:
-
-# TBD
 
 # ------------------Data Management Variables --------------------------------
 
@@ -146,8 +103,8 @@ def main(
         metric="loss",
         mode="min",
         config=SEARCH_SPACE,
-        resources_per_trial=RESOURCES_PER_TRIAL,
-        num_samples=NUM_HYPERPARAM_SAMPLES,
+        resources_per_trial=dict(cpu=8, gpu=0.9),
+        num_samples=1,
         storage_path=str(RUN_DIR),
         search_alg=BasicVariantGenerator(),
         scheduler=FIFOScheduler(),

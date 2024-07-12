@@ -25,12 +25,12 @@ LOCAL_MODE = False  # Set to True to run locally (for debugging)
 OVERWRITE = True  # Set to True to overwrite existing run
 WANDB_LOGGING = False  # Set to True to log to WandB (need an account)
 
-MAX_EPOCHS = 100
-MODEL = "NODE"
+MAX_EPOCHS = 300
+MODEL = "gNODE"
 TASK = "MultiTask"
 task_detail = "CDM_1"   
 NUM_HYPERPARAM_SAMPLES = 1
-RESOURCES_PER_TRIAL = {"CPU": 1, "GPU": 0.25}   # around 0.25 gpu per node_cdm trial
+RESOURCES_PER_TRIAL = {"CPU": 2, "GPU": 0.25}   # around 0.25 gpu per node_cdm trial
 # TUNE_SEARCH_ALG=
 # TUNE_SCHEDULER=
 
@@ -41,7 +41,7 @@ RUN_DESC = f"{MODEL}_{TASK}_{task_detail}_{MAX_EPOCHS}epoch"  # For WandB and ru
 SEARCH_SPACE = dict(
     model = dict(
         latent_size = tune.grid_search([2,3,5,10]),
-        # gating_linear = tune.grid_search([True]), 
+        gating_linear = tune.grid_search([True]), 
         # gating_n_layers = tune.grid_search([1,10])    ,  
         # euler_step_size = tune.grid_search([0.1, 0.01]),
     ),
@@ -58,14 +58,13 @@ SEARCH_SPACE = dict(
     # configs for dataset (timeseries trials) creation
     params=dict(
         seed=0,
-        batch_size=tune.grid_search([32, 64, 128]),   
-        n_samples=1000,                   # number of trials to simulate
+        batch_size=32,   
+        n_samples=800,                   # number of trials to simulate
         # num_workers=tune.choice([4]),  # for the DataLoader. != Ray workers. Usually set = CPUs
     ),
     # task parameters
     env_task=dict(
         task_list=["ContextIntMod1"],    # if using choice remember to use double brackets [[...]]
-        #latent_l2_wt=tune.grid_search([1e-6, 1e-3]),
     ),
     # simulation task params
     env_sim=dict(

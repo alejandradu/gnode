@@ -58,7 +58,7 @@ SEARCH_SPACE = dict(
     # configs for dataset (timeseries trials) creation
     params=dict(
         seed=0,
-        batch_size=tune.grid_search([32, 64, 128]),   
+        batch_size=tune.grid_search([128]),   
         n_samples=1000,                   # number of trials to simulate
         # num_workers=tune.choice([4]),  # for the DataLoader. != Ray workers. Usually set = CPUs
     ),
